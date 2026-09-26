@@ -232,6 +232,25 @@ h1{font-size:34px;font-weight:500;letter-spacing:-.025em;margin:0}
   font-size:13.5px;z-index:60;opacity:0;pointer-events:none;transition:.2s;max-width:92vw}
 .toast[data-show="true"]{opacity:1;transform:translate(-50%,0)}
 .muted{color:var(--muted)}
+.tlm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
+table.tlm{border-collapse:collapse;width:100%;min-width:620px;font-size:13px}
+.tlm th,.tlm td{padding:9px 13px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line-2)}
+.tlm th:first-child,.tlm td:first-child{text-align:left;position:sticky;left:0;background:var(--card);z-index:2;box-shadow:2px 0 4px -2px rgba(0,0,0,.08)}
+.tlm thead th{color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line)}
+.tlm thead th:first-child{z-index:3}
+.tlm .role-row td{background:var(--line-2);color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:7px 13px;box-shadow:none}
+.tlm .role-row td:first-child{background:var(--line-2)}
+.tlm tbody tr:not(.role-row):hover td{background:var(--line-2)}
+.tlm td.name-cell{cursor:pointer}
+.tlm td.name-cell:hover{text-decoration:underline}
+.tlm td.name-cell .rl{display:block;color:var(--muted);font-size:11px;font-weight:400}
+.tlm td.cell-btn{cursor:pointer}
+.tlm td.cell-btn:hover{text-decoration:underline;background:var(--line-2)}
+.tlm td.cell-empty{color:var(--muted)}
+.tlm td.warn-cell{background:var(--warn-bg,#FAE7DC);color:var(--warn-t,#9A4B22);font-weight:500}
+.tlm tfoot td{font-weight:600;border-top:2px solid var(--line);border-bottom:0;background:var(--card)}
+.tlm tfoot td:first-child{position:sticky;left:0;background:var(--card)}
+.tlm th .dot{width:8px;height:8px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:1px}
 
 @media (max-width:1100px){
   .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -326,7 +345,12 @@ let PROJECTS = [
   ]},
   {id:'vida',    name:'Vida',               prio:4, status:'confirmed', revenue:9500, currency:'USD', payments:[]},
   {id:'gunther', name:'Gunther restaurant', prio:3, status:'confirmed', revenue:6000, currency:'USD', payments:[]},
+  {id:'jinan5',      name:'Jinan 5',       prio:5, status:'confirmed', revenue:0, currency:'USD', payments:[]},
+  {id:'hotelmarocco',name:'Hotel Marocco', prio:6, status:'confirmed', revenue:0, currency:'USD', payments:[]},
+  {id:'thecove',     name:'The Cove',      prio:9, status:'potential', revenue:0, currency:'USD', payments:[]},
 ];
+/* jinan5 / hotelmarocco: real contract value not given yet — revenue 0 until filled in.
+   thecove: potential — status keeps it out of confirmed totals and off the real team calendar. */
 /* contract: Palm villa M109, 730 sqm, Mr. Majed, Dubai — total AED 136,800 (incl. special discount), issued 30/06/2026 */
 const STATUS = {
   approved:{lab:'Approved',    col:'var(--appr)',  ink:'var(--appr-t)'},
@@ -379,6 +403,27 @@ zone({p:'majed', d:'viz', floor:'Exterior', n:1, name:'Exterior', effort:7, stat
 zone({p:'majed', d:'wd', floor:'Facade',    n:1, name:'Facade drawings',    effort:7, status:'approved', a:'KT'});
 zone({p:'majed', d:'wd', floor:'Landscape', n:1, name:'Landscape drawings', effort:7, status:'approved', a:'AN'});
 
+// Jinan 5 · апартаменти 120 м² — 4 кімнати вже зроблені, лишився один зведений ревіжн (2 дні), потім креслення
+[['Living',2,'A'],['Kitchen',2,'A'],['Master Bedroom',2,'A'],['Guest Bedroom',2,'A']]
+  .forEach(([nm,e,st],i)=>zone({p:'jinan5', d:'viz', floor:'Apartment', n:i+1, name:nm, effort:e, status:MAP[st], a:'OL'}));
+zone({p:'jinan5', d:'viz', floor:'Apartment', n:5, name:'Revision — remove LED lighting, marble in living', effort:2, revEffort:2, status:'revision', a:'OL'});
+[['Plans',7],['Elevations',10],['Technical requirements',7]]
+  .forEach(([nm,e],i)=>zone({p:'jinan5', d:'wd', floor:'Apartment', n:i+1, name:nm, effort:e, status:'pending', a:null,
+    after:{p:'jinan5', floor:'Apartment', lag:0}}));
+
+// Hotel Marocco · тільки креслення лишились — 3D вже завершене поза цим застосунком
+[['Typical Floor',3,'AN'],['RDS Floor',5,'AN'],['Mezanin Floor',7,'KT']]
+  .forEach(([nm,e,a],i)=>zone({p:'hotelmarocco', d:'wd', floor:nm, n:i+1, name:nm, effort:e, status:'pending', a}));
+
+// The Cove · потенційний проєкт — заплановано, але не займає реальний календар, доки не підтверджено
+[['Master bathroom+wardrobe',3],['Bedroom 1',3],['Bedroom 2',3],['Bedroom 3',2],['Bathroom 3+wardrobe',1],
+ ['WC',1],['Pantry',1],['Laundry',1]]
+  .forEach(([nm,e],i)=>zone({p:'thecove', d:'viz', floor:'Apartment', n:i+1, name:nm, effort:e, status:'pending', a:'OL'}));
+zone({p:'thecove', d:'viz', floor:'Apartment', n:9, name:'Living & Kitchen', effort:4, status:'approved', a:'OL'});
+[['Plans',7],['Elevations',10],['Technical requirements',7]]
+  .forEach(([nm,e],i)=>zone({p:'thecove', d:'wd', floor:'Apartment', n:i+1, name:nm, effort:e, status:'pending', a:null,
+    after:{p:'thecove', floor:'Apartment', lag:0}}));
+
 // будь-яка зона фрилансера без вказаної ціни отримує явний $0 до заповнення (замість тихого безкоштовного in-house)
 Z.filter(z=>z.a && TEAM.find(m=>m.id===z.a && m.type==='freelance') && !z.outsource).forEach(z=>z.outsource={cost:0});
 
@@ -411,6 +456,27 @@ let CALC = [
     dwgInt:[{name:'GF Plans',eff:14},{name:'GF Elevations',eff:14},{name:'GF Technical requirements',eff:14},
             {name:'FF Plans',eff:14},{name:'FF Elevations',eff:14},{name:'FF Technical requirements',eff:14}],
     dwgExt:[{name:'Facade (Maria)',eff:7},{name:'Landscape (Julia)',eff:7}]},
+  // Jinan 5 — 120 m² apartment, already in Production
+  {id:'c-jinan5', name:'Jinan 5', budget:0, pmFee:0, designRate:115, archRate:90, currency:'USD',
+    archExecutor:null, committedProjectId:'jinan5',
+    floors:[{name:'Apartment', rooms:4, eff:2, executor:'OL'}],
+    ext:null, outsourceExt:null,
+    dwgInt:[{name:'Plans',eff:7},{name:'Elevations',eff:10},{name:'Technical requirements',eff:7}],
+    dwgExt:[]},
+  // Hotel Marocco — 3D done outside this app; only drawings tracked here
+  {id:'c-hotelmarocco', name:'Hotel Marocco', budget:0, pmFee:0, designRate:115, archRate:90, currency:'USD',
+    archExecutor:null, committedProjectId:'hotelmarocco',
+    floors:[],
+    ext:null, outsourceExt:null,
+    dwgInt:[{name:'Typical Floor',eff:3},{name:'RDS Floor',eff:5},{name:'Mezanin Floor',eff:7}],
+    dwgExt:[]},
+  // The Cove — potential project (see PROJECTS.thecove.status)
+  {id:'c-thecove', name:'The Cove (potential)', budget:0, pmFee:0, designRate:115, archRate:90, currency:'USD',
+    archExecutor:null, committedProjectId:'thecove',
+    floors:[{name:'Apartment', rooms:9, eff:2.11, executor:'OL'}],
+    ext:null, outsourceExt:null,
+    dwgInt:[{name:'Plans',eff:7},{name:'Elevations',eff:10},{name:'Technical requirements',eff:7}],
+    dwgExt:[]},
 ];
 function calcTotals(c){
   const designInt = c.floors.reduce((n,f)=>n+f.rooms*f.eff,0);
@@ -492,6 +558,7 @@ function build(extra=[]){
   };
   const ready = (it, day) => {
     if(it.rem<=0 || D(it.earliest)>day) return false;
+    if(proj(it.p).status!=='confirmed') return false;   // потенційний проєкт не займає реальний календар, доки не підтверджений
     if(!it.after) return true;
     const f = floorDone(it.after.p, it.after.floor);
     return f && addDays(D(f), it.after.lag) < day;
@@ -572,6 +639,36 @@ function freeFrom(id){
   return null;
 }
 function remainingOf(id){ return S.items.filter(x=>x.a===id).reduce((n,x)=>n+active(x),0) }
+/* усі невиконані дні, що належать ПІДТВЕРДЖЕНИМ проєктам — потенційні сюди не входять (правило 7) */
+function remainingConfirmed(id){
+  return Z.filter(z=>z.a===id && proj(z.p).status==='confirmed').reduce((n,z)=>n+active(z),0);
+}
+/* ЄДИНЕ джерело правди для Team Load — і матриця, і KPI зверху рахують саме звідси, щоб цифри сходились.
+   available   — робочі дні періоду (поки відпустки/лікарняні не ведемо — це чесно позначено в підписі)
+   scheduled   — скільки з цих днів рушій реально поставив у розклад людини В МЕЖАХ періоду (по проєктах)
+   free        — available − scheduled, ніколи не може бути відʼємним (рушій не бронює два завдання на один день)
+   overload    — scheduled − available; структурно завжди 0 у цьому рушії (один день = одне завдання),
+                 лишаємо як окрему, чесно нульову колонку, а не ховаємо
+   beyond      — залишок роботи, який не влазить у вікно періоду і піде далі в чергу */
+function periodLoad(id, per){
+  const available = workdays(new Date(Math.max(TODAY, per.start)), per.end);
+  const byProject = {};
+  let scheduled = 0;
+  [...S.occ[id].keys()].forEach(k=>{
+    if(D(k)<per.start || D(k)>per.end) return;
+    const it = S.byId.get(S.occ[id].get(k));
+    if(!it || proj(it.p).status!=='confirmed') return;
+    byProject[it.p] = (byProject[it.p]||0)+1;
+    scheduled++;
+  });
+  const totalRemaining = remainingConfirmed(id);
+  return {
+    available, scheduled, byProject,
+    free: Math.max(0, available-scheduled),
+    overload: Math.max(0, scheduled-available),
+    beyond: Math.max(0, totalRemaining-scheduled),
+  };
+}
 
 /* суцільні вільні проміжки людини від сьогодні */
 function gapsOf(id){
@@ -765,10 +862,13 @@ function viewProduction(){
   return `
   <div class="head">
     <h1>${esc(pr.name)} · ${dc.name}</h1>
+    ${pr.status!=='confirmed'? `<span style="background:var(--pot,#EEEAF7);color:var(--pot-t,#5A4C9C);border-radius:20px;padding:5px 13px;font-size:12.5px;font-weight:500">Potential — not scheduled yet</span>
+      <button class="pill" data-confirm-project="${pr.id}">Confirm project</button>` : ''}
     <div class="spacer"></div>
     <div class="seg">${Object.entries(DISC).map(([k,v])=>`<button data-disc="${k}" aria-pressed="${state.disc===k}">${v.short==='3D'?'3D':'Drawings'}</button>`).join('')}</div>
-    <select class="sel" id="projSel">${projects.map(p=>`<option value="${p.id}" ${p.id===pr.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+    <select class="sel" id="projSel">${projects.map(p=>`<option value="${p.id}" ${p.id===pr.id?'selected':''}>${esc(p.name)}${p.status!=='confirmed'?' (potential)':''}</option>`).join('')}</select>
   </div>
+  ${pr.status!=='confirmed'? `<p class="muted" style="font-size:12.5px;margin:-10px 0 18px">Rooms and drawings below are planned but don't occupy anyone's real calendar until you confirm this project.</p>`:''}
 
   <div class="kpis">
     <div class="kpi"><div class="l">Total ${dc.unit}</div><div class="v">${b.total}</div><div class="f">${b.totalW} ${dc.role.toLowerCase()}-days planned</div></div>
@@ -918,43 +1018,72 @@ function donut(b, dc){
    VIEW 2 · STUDIO LOAD
    ====================================================================== */
 const PROJECT_PALETTE = ['#EDC9CD','#CBD9EC','#F1DDB5','#D3E2DA','#DCD5F0','#E7C9A9','#C9E4D8','#E3C9DE'];
-function teamLoadPanel(){
+const ROLE_LABEL = {viz:'Designer', wd:'Architect', pm:'Procurement Manager'};
+/* один розрахунок на всю сторінку: і матриця, і KPI зверху читають ці самі числа — тому вони завжди сходяться */
+function teamLoadData(per){
   const live = PROJECTS.filter(p=>p.status==='confirmed');
+  const rows = TEAM.map(m=>({m, L:periodLoad(m.id, per)}));
+  const usedProjectIds = new Set();
+  rows.forEach(r=>Object.keys(r.L.byProject).forEach(pid=>usedProjectIds.add(pid)));
+  const cols = live.filter(p=>usedProjectIds.has(p.id));
   const projColor = {}; live.forEach((p,i)=>projColor[p.id]=PROJECT_PALETTE[i%PROJECT_PALETTE.length]);
-  const byPerson = TEAM.map(m=>{
-    const byProj = {};
-    Z.filter(z=>z.a===m.id && proj(z.p).status==='confirmed').forEach(z=>{
-      const d = active(z); if(!d) return;
-      byProj[z.p] = (byProj[z.p]||0) + d;
-    });
-    const total = Object.values(byProj).reduce((a,b)=>a+b,0);
-    return {m, byProj, total};
-  });
-  const grand = byPerson.reduce((n,x)=>n+x.total,0);
-  const maxTotal = Math.max(1,...byPerson.map(x=>x.total));
+  const totals = {
+    available: rows.reduce((n,r)=>n+r.L.available,0),
+    scheduled: rows.reduce((n,r)=>n+r.L.scheduled,0),
+    free: rows.reduce((n,r)=>n+r.L.free,0),
+    overload: rows.reduce((n,r)=>n+r.L.overload,0),
+    beyond: rows.reduce((n,r)=>n+r.L.beyond,0),
+    byProject: {},
+  };
+  cols.forEach(p=>{ totals.byProject[p.id] = rows.reduce((n,r)=>n+(r.L.byProject[p.id]||0),0); });
+  return {rows, cols, projColor, totals};
+}
+function teamLoadPanel(per){
+  const TL = teamLoadData(per);
+  const groups = [...new Set(TEAM.map(m=>m.team))];
   return `<section class="card" style="margin-bottom:16px">
-    <div class="card-h"><h2>Team load</h2><span class="hint">remaining assigned days per person, by project</span></div>
+    <div class="card-h"><h2>Team load</h2><span class="hint">${fmt(per.start)} – ${fmt(per.end)} · ${TL.rows[0]?TL.rows[0].L.available:0} working days per person · remaining effort scheduled in this period</span></div>
     <div class="card-b">
-      ${byPerson.map(x=>{
-        const entries = Object.entries(x.byProj).sort((a,b)=>b[1]-a[1]);
-        return `<div style="margin-bottom:18px">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
-            <span style="font-size:15px">${x.m.name} <span class="muted" style="font-size:12.5px">· ${DISC[x.m.team].role}</span></span>
-            <span class="money" style="font-size:15px">${x.total} d</span>
-          </div>
-          <div style="height:14px;border-radius:7px;background:var(--line-2);overflow:hidden;display:flex">
-            ${entries.length? entries.map(([pid,d])=>`<div style="width:${Math.max(2,d/maxTotal*100)}%;background:${projColor[pid]}" title="${esc(proj(pid).name)}: ${d}d"></div>`).join('') : ''}
-          </div>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:7px">
-            ${entries.length? entries.map(([pid,d])=>`<span class="muted" style="font-size:11.5px;display:inline-flex;align-items:center;gap:5px">
-              <i style="width:9px;height:9px;border-radius:3px;background:${projColor[pid]};display:inline-block"></i>${esc(proj(pid).name)} · ${d}d</span>`).join('')
-              : '<span class="muted" style="font-size:11.5px">no assigned work</span>'}
-          </div>
-        </div>`;
-      }).join('')}
-      <div style="border-top:1px solid var(--line);padding-top:13px;margin-top:2px;display:flex;justify-content:space-between;font-size:15px">
-        <span>Studio total, all confirmed projects</span><span class="money" style="font-weight:500">${grand} d</span>
-      </div>
+      <div class="tlm-wrap"><table class="tlm">
+        <thead><tr>
+          <th>Team member</th>
+          ${TL.cols.map(p=>`<th><i class="dot" style="background:${TL.projColor[p.id]}"></i>${esc(p.name)}</th>`).join('')}
+          <th>Total</th><th>Available</th><th>Free</th><th>Overload</th><th>Beyond period</th>
+        </tr></thead>
+        <tbody>
+          ${groups.map(g=>{
+            const members = TL.rows.filter(r=>r.m.team===g);
+            if(!members.length) return '';
+            return `<tr class="role-row"><td colspan="${TL.cols.length+6}">${ROLE_LABEL[g]||g}</td></tr>` +
+              members.map(r=>{
+                const total = TL.cols.reduce((n,p)=>n+(r.L.byProject[p.id]||0),0);
+                return `<tr>
+                  <td class="name-cell" data-person-load="${r.m.id}">${esc(r.m.name)}<span class="rl">${r.m.type==='freelance'?'Outsource':''}</span></td>
+                  ${TL.cols.map(p=>{
+                    const v=r.L.byProject[p.id]||0;
+                    return v? `<td class="cell-btn" data-cell-load="${r.m.id}|${p.id}">${v} d</td>` : `<td class="cell-empty">—</td>`;
+                  }).join('')}
+                  <td>${total||'—'}</td>
+                  <td class="muted">${r.L.available}</td>
+                  <td>${r.L.free||'—'}</td>
+                  <td class="${r.L.overload?'warn-cell':'cell-empty'}">${r.L.overload||'—'}</td>
+                  <td class="${r.L.beyond?'warn-cell':'cell-empty'}">${r.L.beyond||'—'}</td>
+                </tr>`;
+              }).join('');
+          }).join('')}
+        </tbody>
+        <tfoot><tr>
+          <td>Studio total</td>
+          ${TL.cols.map(p=>`<td>${TL.totals.byProject[p.id]||'—'} d</td>`).join('')}
+          <td>${TL.totals.scheduled} d</td>
+          <td>${TL.totals.available} d</td>
+          <td>${TL.totals.free} d</td>
+          <td class="${TL.totals.overload?'warn-cell':''}">${TL.totals.overload||'—'}</td>
+          <td class="${TL.totals.beyond?'warn-cell':''}">${TL.totals.beyond||'—'} d</td>
+        </tr></tfoot>
+      </table></div>
+      <div class="note" style="margin-top:14px">Choose a team member to see which stages make up their days.</div>
+      <p class="muted" style="font-size:11.5px;margin-top:10px">Days are effort scheduled inside this period, not calendar dates — a project cell opens its stage and room detail. Available assumes a Mon–Fri week with no holidays or leave tracked yet. Overload would mean two things booked on the same day, which this scheduler never allows — so it reads 0 here; "Beyond period" is the honest signal for backlog that won't fit before ${fmt(per.end)}.</p>
     </div>
   </section>`;
 }
@@ -965,10 +1094,10 @@ function viewLoad(){
   const confirmed = live.reduce((n,z)=>n+active(z),0);
   const inRange = workdays(new Date(Math.max(TODAY,r.start)), r.end);
   const capacity = TEAM.length * inRange;
-  const busyIn = TEAM.reduce((n,m)=>n+[...S.occ[m.id].keys()].filter(k=>D(k)>=r.start&&D(k)<=r.end).length,0);
-  const free = capacity - busyIn;
+  const teamLoad = teamLoadData(r);            // одне джерело правди — і тут, і в самій матриці нижче
+  const free = teamLoad.totals.free;           // сума ПОЗИТИВНОЇ вільності по кожній людині (правило 6), не нетто
   const slots = TEAM.map(m=>({m, d:freeFrom(m.id)})).filter(x=>x.d).sort((a,b)=>a.d-b.d);
-  const over = TEAM.map(m=>({m, n:remainingOf(m.id)-inRange})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+  const beyond = teamLoad.rows.map(x=>({m:x.m, n:x.L.beyond})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
 
   // рядки: проєкт · дисципліна
   const stages=[];
@@ -983,13 +1112,13 @@ function viewLoad(){
   <div class="kpis">
     <div class="kpi"><div class="l">Confirmed effort</div><div class="v">${confirmed} days</div><div class="f">left in confirmed projects</div></div>
     <div class="kpi"><div class="l">Capacity</div><div class="v">${capacity} days</div><div class="f">${TEAM.length} people · ${inRange} working days</div></div>
-    <div class="kpi"><div class="l">Free capacity</div><div class="v">${free} days</div><div class="f">unassigned till ${fmt(r.end)}</div></div>
+    <div class="kpi"><div class="l">Free capacity</div><div class="v">${free} days</div><div class="f">sum of each person's own free days, ${fmt(r.start)}–${fmt(r.end)}</div></div>
     <div class="kpi"><div class="l">First team slot</div><div class="v">${slots[0]?fmt(slots[0].d):'—'}</div><div class="f">${slots[0]?slots[0].m.name+' · a free week':'no free week'}</div></div>
-    <div class="kpi ${over.length?'warn':''}"><div class="l">Overloaded</div><div class="v">${over.length? over[0].m.name+' +'+over[0].n+'d':'No one'}</div>
-      <div class="f">${over.length? 'work beyond '+fmt(r.end) : 'everything fits the window'}</div></div>
+    <div class="kpi ${beyond.length?'warn':''}"><div class="l">Beyond this period</div><div class="v">${beyond.length? beyond[0].m.name+' +'+beyond[0].n+'d':'No one'}</div>
+      <div class="f">${beyond.length? 'backlog past '+fmt(r.end) : 'everything fits the window'}</div></div>
   </div>
 
-  ${teamLoadPanel()}
+  ${teamLoadPanel(r)}
 
   <section class="card" style="margin-bottom:16px">
     <div class="card-h"><h2>Projects × weeks</h2><span class="hint">one line = one project stage · bar = who and how many days</span></div>
@@ -1506,6 +1635,40 @@ function openZone(id){
 
     <button class="btn ghost" data-del style="margin-top:20px;width:100%">Remove ${dc.unit1}</button>`);
 }
+/* деталізація клітинки Team Load: Project → discipline → floor/zone → assignee → залишок */
+function loadDetailRows(personId, projectFilterId, per){
+  return Z.filter(z=>z.a===personId && proj(z.p).status==='confirmed' && (!projectFilterId || z.p===projectFilterId) && active(z)>0)
+    .map(z=>{ const it=S.byId.get(z.id); return {z, it}; })
+    .sort((a,b)=>proj(a.z.p).prio-proj(b.z.p).prio || (a.it.s? D(a.it.s)-D(b.it.s) : 1));
+}
+function openLoadDetail(personId, projectFilterId){
+  const m = person(personId), per = range();
+  const rows = loadDetailRows(personId, projectFilterId, per);
+  const title = projectFilterId ? `${m.name} · ${proj(projectFilterId).name}` : `${m.name} — all confirmed projects`;
+  drawer(`<button class="x" data-close aria-label="Close">×</button>
+    <div class="muted" style="font-size:13px">${ROLE_LABEL[m.team]||m.team}${m.type==='freelance'?' · Outsource':''}</div>
+    <h3>${esc(title)}</h3>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 16px">How this person's remaining effort breaks down — project → discipline → zone → status.</p>
+    ${rows.length? rows.map(({z,it})=>{
+      const dv=DISC[z.d], st=STATUS[z.status];
+      const when = it && it.s ? (D(it.s)>=per.start && D(it.e)<=per.end ? `${fmt(D(it.s))} – ${fmt(D(it.e))}` :
+        D(it.s)>per.end ? `starts after ${fmt(per.end)}` : `${fmt(D(it.s))} – ${fmt(D(it.e))} (spills past ${fmt(per.end)})`)
+        : 'not yet scheduled';
+      return `<div style="padding:12px 0;border-bottom:1px solid var(--line-2);cursor:pointer" data-open-zone="${z.id}">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
+          <span style="font-size:14px">${esc(proj(z.p).name)} <span class="muted" style="font-size:12px">· ${dv.name} · ${esc(z.floor||'')}</span></span>
+          <span style="font-weight:500">${active(z)} d</span>
+        </div>
+        <div style="margin-top:3px;font-size:12.5px;color:var(--ink-2)">${esc(z.name)}</div>
+        <div style="margin-top:4px;display:flex;gap:8px;align-items:center;font-size:11.5px">
+          <span style="background:${st.col};color:${st.ink};border-radius:20px;padding:2px 9px">${st.lab}</span>
+          <span class="muted">${when}</span>
+        </div>
+      </div>`;
+    }).join('') : '<div class="muted" style="padding:14px 0">No remaining effort here.</div>'}
+    ${projectFilterId? `<button class="pill" data-goto="${projectFilterId}|${rows[0]?rows[0].z.d:'viz'}" style="margin-top:16px">Open in Project Production →</button>` : ''}
+  `);
+}
 function drawer(h){ const d=document.getElementById('drawer'); d.innerHTML=h; d.dataset.open='true'; document.getElementById('scrim').dataset.open='true'; }
 function closeDrawer(){ state.selZone=null; document.getElementById('drawer').dataset.open='false'; document.getElementById('scrim').dataset.open='false'; render(); }
 let TT; function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.dataset.show='true'; clearTimeout(TT); TT=setTimeout(()=>t.dataset.show='false',2600); }
@@ -1541,6 +1704,9 @@ document.addEventListener('click', e=>{
     render(); return;
   }
   if(n=el('[data-goto]')){ const [p,d]=n.dataset.goto.split('|'); state.project=p; state.disc=d; state.tab='production'; render(); window.scrollTo({top:0}); return; }
+  if(n=el('[data-cell-load]')){ const [pid,proj_]=n.dataset.cellLoad.split('|'); openLoadDetail(pid, proj_); return; }
+  if(n=el('[data-person-load]')){ openLoadDetail(n.dataset.personLoad, null); return; }
+  if(n=el('[data-open-zone]')){ openZone(n.dataset.openZone); return; }
   if(n=el('[data-zone]')){ openZone(n.dataset.zone); render(); openZone(n.dataset.zone); return; }
   if(n=el('[data-add]')){
     const f=n.dataset.add, same=Z.filter(z=>z.p===state.project&&z.d===state.disc&&z.floor===f);
@@ -1621,6 +1787,12 @@ document.addEventListener('click', e=>{
     CALC.push({id, name:'New project', budget:0, pmFee:0, designRate:115, archRate:90, currency:'USD', archExecutor:null, committedProjectId:null,
       floors:[{name:'Ground Floor', rooms:1, eff:2, executor:null}], ext:null, outsourceExt:null, dwgInt:[{name:'Drawings', eff:5}], dwgExt:[]});
     render(); return;
+  }
+  if(n=el('[data-confirm-project]')){
+    const p = proj(n.dataset.confirmProject);
+    p.status='confirmed'; dbSaveProject(p); S=build(); render();
+    toast(`${p.name} confirmed — now scheduled with the team`);
+    return;
   }
   if(n=el('[data-pay-toggle]')){
     const [pid, idxStr] = n.dataset.payToggle.split('|'), i=+idxStr;
