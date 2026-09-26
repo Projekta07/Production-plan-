@@ -1038,6 +1038,48 @@ function teamLoadData(per){
   cols.forEach(p=>{ totals.byProject[p.id] = rows.reduce((n,r)=>n+(r.L.byProject[p.id]||0),0); });
   return {rows, cols, projColor, totals};
 }
+function studioProgressPanel(){
+  const disc = state.studioDisc || 'viz', dc = DISC[disc];
+  const zones = Z.filter(z=>z.d===disc && proj(z.p).status==='confirmed');
+  const b = breakdown(zones);
+  const rows = [...new Set(zones.map(z=>z.p))].map(pid=>proj(pid)).sort((a,b)=>a.prio-b.prio);
+  return `<section class="card" style="margin-bottom:16px">
+    <div class="card-h"><h2>Production progress — all projects</h2>
+      <div class="seg">${Object.entries(DISC).map(([k,v])=>`<button data-studio-disc="${k}" aria-pressed="${disc===k}">${v.short==='3D'?'3D':'Drawings'}</button>`).join('')}</div>
+      <span class="hint">confirmed projects only</span></div>
+    <div class="card-b">
+      <div class="grid2">
+        <section class="card" style="box-shadow:none">
+          <div class="card-h"><h2>${dc.unit[0].toUpperCase()+dc.unit.slice(1)} by project</h2><span class="hint">1 square = 1 ${dc.unit1} · tap to open</span></div>
+          <div class="card-b">
+            ${rows.map(p=>{
+              const pz = zones.filter(z=>z.p===p.id).sort((a,b)=>floorOrder(a.floor)-floorOrder(b.floor) || a.n-b.n);
+              const done = pz.filter(z=>z.status==='approved').length;
+              const left = pz.reduce((n,z)=>n+active(z),0);
+              return `<div class="floor">
+                <div><div class="fn">${esc(p.name)}</div><div class="fc">${done} / ${pz.length} approved${pz.some(z=>z.outsource)?' · <span style="color:var(--pot-t)">outsourced</span>':''}</div></div>
+                <div class="pills">${pz.map(z=>`<button class="pill ${z.status} ${state.selZone===z.id?'sel':''}" data-zone="${z.id}"
+                    title="${esc(p.name)} · ${esc(z.name)} · ${STATUS[z.status].lab} · ${z.effort}d${z.a?' · '+person(z.a).name:''}">${disc==='viz'?String(z.n).padStart(2,'0'):esc(z.name)}</button>`).join('')}</div>
+                <div class="left">${left? left+'d left' : '<span style="color:var(--appr-t)">done</span>'}</div>
+              </div>`;
+            }).join('') || `<div class="muted">No confirmed ${dc.name.toLowerCase()} work yet.</div>`}
+            <div class="legend">
+              <span><i style="background:var(--appr)"></i>Approved</span>
+              <span><i style="background:var(--rev)"></i>Revision</span>
+              <span><i style="background:var(--pause)"></i>Paused</span>
+              <span><i style="background:var(--ns);border:1px dashed var(--ns-b)"></i>Not started</span>
+            </div>
+          </div>
+        </section>
+        <section class="card" style="box-shadow:none">
+          <div class="card-h"><h2>${dc.name} progress</h2><span class="hint">effort, not calendar</span></div>
+          <div class="card-b">${donut(b, dc)}</div>
+        </section>
+      </div>
+    </div>
+  </section>`;
+}
+
 function teamLoadPanel(per){
   const TL = teamLoadData(per);
   const groups = [...new Set(TEAM.map(m=>m.team))];
@@ -1117,6 +1159,8 @@ function viewLoad(){
     <div class="kpi ${beyond.length?'warn':''}"><div class="l">Beyond this period</div><div class="v">${beyond.length? beyond[0].m.name+' +'+beyond[0].n+'d':'No one'}</div>
       <div class="f">${beyond.length? 'backlog past '+fmt(r.end) : 'everything fits the window'}</div></div>
   </div>
+
+  ${studioProgressPanel()}
 
   ${teamLoadPanel(r)}
 
@@ -1703,6 +1747,7 @@ document.addEventListener('click', e=>{
     if(!Z.some(z=>z.p===state.project&&z.d===state.disc)){ const p=Z.find(z=>z.d===state.disc); if(p) state.project=p.p; }
     render(); return;
   }
+  if(n=el('[data-studio-disc]')){ state.studioDisc=n.dataset.studioDisc; render(); return; }
   if(n=el('[data-goto]')){ const [p,d]=n.dataset.goto.split('|'); state.project=p; state.disc=d; state.tab='production'; render(); window.scrollTo({top:0}); return; }
   if(n=el('[data-cell-load]')){ const [pid,proj_]=n.dataset.cellLoad.split('|'); openLoadDetail(pid, proj_); return; }
   if(n=el('[data-person-load]')){ openLoadDetail(n.dataset.personLoad, null); return; }
