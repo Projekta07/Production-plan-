@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ARCHITEKTA — Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F0EC; --card:#FFFFFF; --line:#E6E3DD; --line-2:#EFEDE9;
+  --ink:#1B1B1A; --ink-2:#55534F; --muted:#8B8883;
+  --appr:#C9E4CF; --appr-t:#2F6B3F;
+  --rev:#EDC9CD;  --rev-t:#8E4750;
+  --pause:#F2DFB6;--pause-t:#7C5E1E;
+  --ns:#EEECE8;   --ns-b:#C9C5BE;
+  --viz:#EDC9CD;  --wd:#CBD9EC;
+  --pot:#EEEAF7;  --pot-b:#B9AEE3; --pot-t:#5A4C9C;
+  --ok:#C9E4CF; --ok-t:#2F6B3F; --warn:#F6DCCB; --warn-t:#9A4B22;
+  --r:18px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141413; --card:#1D1D1C; --line:#2C2C2A; --line-2:#252523;
+  --ink:#F1EFEA; --ink-2:#BDBAB4; --muted:#8B8883;
+  --ns:#262624; --ns-b:#4A4843; --pot:#26233A; --warn:#3A2A1F; --ok:#20352A;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---------- shell ---------- */
+.top{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.top-in{max-width:1320px;margin:0 auto;padding:20px 28px 16px}
+.brand-row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.brand{font-size:15px;letter-spacing:.26em;font-weight:500}
+.range{display:flex;align-items:center;gap:8px;color:var(--ink-2);font-size:14px}
+.range button{padding:3px 8px;border-radius:8px;color:var(--muted)}
+.range button:hover{background:var(--line-2);color:var(--ink)}
+.spacer{flex:1}
+.tabs{display:flex;background:var(--line-2);border-radius:14px;padding:5px;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tabs button{padding:11px 14px;border-radius:10px;color:var(--muted);font-size:13px;white-space:nowrap;flex:none}
+.tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.main{max-width:1320px;margin:0 auto;padding:26px 28px 80px}
+h1{font-size:34px;font-weight:500;letter-spacing:-.025em;margin:0}
+.head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+
+.sel{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:10px 38px 10px 16px;font-size:15px;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--ink-2) 50%),linear-gradient(135deg,var(--ink-2) 50%,transparent 50%);
+  background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+.seg{display:inline-flex;background:var(--line-2);border-radius:11px;padding:4px;gap:2px}
+.seg button{padding:7px 13px;border-radius:8px;color:var(--muted);font-size:13px;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r)}
+.card-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:18px 24px;border-bottom:1px solid var(--line)}
+.card-h h2{font-size:17px;font-weight:500;margin:0}
+.card-h .hint{margin-left:auto;color:var(--muted);font-size:13px}
+.card-b{padding:22px 24px}
+
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;min-width:0}
+.kpi .l{color:var(--muted);font-size:13px}
+.kpi .v{font-size:30px;font-weight:400;letter-spacing:-.02em;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .f{color:var(--muted);font-size:12px;margin-top:4px}
+.kpi.warn .v{color:var(--warn-t)}
+
+.grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+.stack{display:flex;flex-direction:column;gap:16px}
+
+/* ---------- rooms by floor ---------- */
+.floor{display:grid;grid-template-columns:96px minmax(0,1fr) 64px;gap:14px;align-items:center;padding:12px 0}
+.floor+.floor{border-top:1px solid var(--line-2)}
+.floor .fn{font-size:15px}
+.floor .fc{color:var(--muted);font-size:12.5px;margin-top:2px}
+.floor .left{text-align:right;font-size:15px;white-space:nowrap}
+.pills{display:flex;flex-wrap:wrap;gap:5px}
+.pill{min-width:30px;height:30px;padding:0 5px;border-radius:9px;display:inline-grid;place-items:center;font-size:12px;
+  font-variant-numeric:tabular-nums;border:1px solid transparent;transition:transform .1s}
+.pill:hover{transform:translateY(-1px)}
+.pill.approved{background:var(--appr);color:var(--appr-t)}
+.pill.revision{background:var(--rev);color:var(--rev-t)}
+.pill.paused{background:var(--pause);color:var(--pause-t)}
+.pill.pending{background:var(--ns);border:1px dashed var(--ns-b);color:var(--ink-2)}
+.pill.add{background:transparent;border:1px dashed var(--ns-b);color:var(--muted)}
+.pill.sel{outline:2px solid var(--ink);outline-offset:1px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--ink-2);font-size:13px;margin-top:16px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:12px;height:12px;border-radius:4px;display:block}
+
+/* ---------- donut ---------- */
+.donut-wrap{display:grid;grid-template-columns:170px minmax(0,1fr);gap:22px;align-items:center}
+.donut{width:170px;height:170px}
+.donut text{font-family:inherit}
+.dl{display:flex;flex-direction:column}
+.dl .r{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line-2)}
+.dl .r:last-child{border-bottom:0}
+.dl .r i{width:10px;height:10px;border-radius:3px;display:block;transform:translateY(1px)}
+.dl .r .n{color:var(--ink-2);font-size:13.5px}
+.dl .r b{font-weight:500;font-size:13.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dl .r .s{grid-column:2/4;color:var(--muted);font-size:12px;margin-top:-6px}
+
+/* ---------- timelines ---------- */
+.tl{--lab:150px}
+.tl-head,.tl-row{display:grid;grid-template-columns:var(--lab) minmax(0,1fr);align-items:center}
+.tl-head{color:var(--muted);font-size:12.5px;border-bottom:1px solid var(--line);padding-bottom:10px}
+.tl-weeks{display:flex}
+.tl-weeks span{flex:1;min-width:0;white-space:nowrap;overflow:hidden}
+.tl-row{border-bottom:1px solid var(--line-2);min-height:54px}
+.tl-row:last-child{border-bottom:0}
+.tl-lab{padding:10px 12px 10px 0;font-size:15px;min-width:0}
+.tl-lab small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+.track{position:relative;height:100%;min-height:54px}
+.track .gl{position:absolute;inset:0;display:flex;pointer-events:none}
+.track .gl i{flex:1;border-left:1px solid var(--line-2)}
+.today{position:absolute;top:4px;bottom:4px;border-left:1.5px dashed var(--ink-2);opacity:.45;pointer-events:none}
+.bar{position:absolute;height:32px;border-radius:9px;display:flex;align-items:center;padding:0 11px;font-size:13px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);cursor:pointer}
+.bar.ghost{background:transparent;color:var(--muted);cursor:default;padding-left:6px}
+.bar.pot{background:var(--pot);border:1.5px dashed var(--pot-b);color:var(--pot-t)}
+.bar.dim{opacity:.55}
+.lanes{position:relative}
+
+/* ---------- potential ---------- */
+.form{display:grid;grid-template-columns:1.3fr 1fr 1fr auto;gap:14px;align-items:end}
+.form label{display:block;color:var(--muted);font-size:13px;margin-bottom:7px}
+.form input,.form select{width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:12px;padding:12px 14px;font-size:15px}
+.btn{background:var(--ink);color:var(--bg);padding:13px 22px;border-radius:12px;font-size:15px;font-weight:500;white-space:nowrap}
+.btn:hover{opacity:.88}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.banner{border-radius:14px;padding:15px 18px;font-size:15.5px;margin-top:16px}
+.banner.ok{background:var(--ok);color:var(--ok-t)}
+.banner.warn{background:var(--warn);color:var(--warn-t)}
+.opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+.opt{border:1px solid var(--line);border-radius:14px;padding:14px 16px;text-align:left;background:var(--card)}
+.opt[aria-pressed="true"]{border-color:var(--ink);background:var(--line-2)}
+.opt .t{font-size:13px;color:var(--muted)}
+.opt .d{font-size:18px;margin-top:4px}
+.opt .w{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+
+/* ---------- drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(20,20,19,.3);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim[data-open="true"]{opacity:1;pointer-events:auto}
+.drawer{position:fixed;right:0;top:0;bottom:0;width:390px;max-width:94vw;background:var(--card);z-index:41;border-left:1px solid var(--line);
+  padding:26px 24px;overflow-y:auto;transform:translateX(100%);transition:transform .22s ease}
+.drawer[data-open="true"]{transform:none}
+.drawer h3{font-size:21px;font-weight:500;margin:4px 0 2px}
+.drawer .x{position:absolute;right:16px;top:16px;font-size:20px;color:var(--muted);padding:4px 10px;border-radius:8px}
+.drawer .x:hover{background:var(--line-2);color:var(--ink)}
+.field{margin-top:20px}
+.field .fl{color:var(--muted);font-size:12.5px;margin-bottom:8px}
+.stbtns{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.stbtns button{padding:10px;border-radius:11px;border:1px solid var(--line);font-size:13.5px;text-align:left}
+.stbtns button[aria-pressed="true"]{border-color:transparent}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.stepper button{padding:9px 15px;font-size:17px}
+.stepper button:hover{background:var(--line-2)}
+.stepper span{min-width:64px;text-align:center;font-size:15px;font-variant-numeric:tabular-nums}
+.drawer select{width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px}
+.note{background:var(--line-2);border-radius:12px;padding:13px 14px;font-size:13.5px;color:var(--ink-2);margin-top:20px;line-height:1.55}
+.note b{color:var(--ink);font-weight:500}
+.tl-lab{display:flex;flex-direction:column;gap:5px}
+.mini-assign{align-self:flex-start;font-size:11px;padding:5px 9px;border:1px solid var(--line);border-radius:8px;color:var(--ink-2)}
+.mini-assign:hover{background:var(--line-2);color:var(--ink)}
+.mini-assign:disabled{opacity:.4;cursor:default}
+.bar.sm{height:21px;font-size:11px;line-height:21px}
+.bar.gap-note{background:transparent;border:1px dotted var(--pot-b);color:var(--pot-t);cursor:default}
+.money{font-variant-numeric:tabular-nums}
+.calc-title{font-size:19px;font-weight:500;border:1px solid transparent;background:transparent;border-radius:9px;padding:5px 8px;margin:-5px 0 -5px -8px;width:100%}
+.calc-title:hover,.calc-title:focus{border-color:var(--line);background:var(--line-2)}
+.calc-sec{margin-bottom:22px}
+.calc-sec:last-child{margin-bottom:0}
+.calc-sec-h{font-size:13px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline}
+.calc-sec-h .muted{text-transform:none;letter-spacing:0;font-weight:400;font-size:12.5px}
+.calc-row{display:grid;grid-template-columns:1.4fr .8fr .9fr .7fr 26px;gap:8px;align-items:center;margin-bottom:6px}
+.calc-row.head{color:var(--muted);font-size:11.5px;margin-bottom:8px}
+.calc-row2{display:grid;grid-template-columns:1.4fr .9fr .7fr 26px;gap:8px;align-items:center;margin-bottom:6px}
+.calc-row input,.calc-row2 input{border:1px solid var(--line);background:var(--line-2);border-radius:8px;padding:8px 9px;font-size:13.5px;width:100%}
+.calc-row .num,.calc-row2 .num{text-align:right;font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.rm{color:var(--muted);font-size:16px;line-height:1;padding:6px;border-radius:7px}
+.rm:hover{background:var(--line-2);color:var(--warn-t)}
+.add{color:var(--muted);font-size:12.5px;padding:7px 10px;border:1px dashed var(--line);border-radius:8px;margin-top:2px}
+.add:hover{background:var(--line-2);color:var(--ink)}
+.calc-out{display:flex;gap:8px;margin:8px 0}
+.calc-out button{flex:1;padding:9px;border-radius:9px;border:1px solid var(--line);font-size:13px}
+.calc-out button[aria-pressed="true"]{border-color:transparent;background:var(--appr);color:var(--appr-t)}
+.calc-fin-row{display:grid;grid-template-columns:1.4fr .8fr .8fr 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--line-2);font-size:13.5px;align-items:center}
+.calc-fin-row:last-of-type{border-bottom:0}
+.calc-fin-row .num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.master-row{display:grid;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2);align-items:center;font-size:14px}
+.master-row.head{color:var(--muted);font-size:11.5px;border-bottom:1px solid var(--line)}
+.master-row.total{font-weight:600;border-top:2px solid var(--line);border-bottom:0;margin-top:4px;padding-top:12px}
+.master-row.derived{color:var(--muted);font-size:13px}
+.master-row .num{text-align:right;font-variant-numeric:tabular-nums}
+.buf-input{width:46px;border:1px solid var(--line);background:var(--line-2);border-radius:7px;padding:3px 5px;font-size:12px;text-align:center}
+.finrow{display:grid;grid-template-columns:1.3fr repeat(4,minmax(0,1fr));gap:10px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line-2)}
+.finrow:last-child{border-bottom:0}
+.finrow .nm{font-size:15px}
+.finrow .sub{color:var(--muted);font-size:12px;margin-top:2px}
+.finrow .num{text-align:right;font-variant-numeric:tabular-nums}
+.fin-head{display:grid;grid-template-columns:1.3fr repeat(4,minmax(0,1fr));gap:10px;color:var(--muted);font-size:12px;padding-bottom:8px;border-bottom:1px solid var(--line);text-align:right}
+.fin-head div:first-child{text-align:left}
+.ratebox{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-2)}
+.ratebox:last-child{border-bottom:0}
+.ratebox input{width:110px;text-align:right;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px}
+.toggle{display:flex;align-items:center;gap:11px;padding:13px 0;border-bottom:1px solid var(--line-2)}
+.toggle:last-child{border-bottom:0}
+.switch{width:38px;height:22px;border-radius:12px;background:var(--line-2);position:relative;flex:none;transition:.15s}
+.switch i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:.15s}
+.switch[aria-pressed="true"]{background:var(--ink)}
+.switch[aria-pressed="true"] i{left:18px}
+.toggle .nm{font-size:15px}
+.toggle .sub{color:var(--muted);font-size:12.5px}
+.stack-chip{display:inline-flex;flex-direction:column;align-items:flex-end;gap:2px}
+.stack-chip small{color:var(--muted);font-size:11px}
+.row-key{display:flex;gap:16px;flex-wrap:wrap;color:var(--ink-2);font-size:12.5px;margin-top:14px}
+.row-key span{display:inline-flex;align-items:center;gap:7px}
+.row-key i{width:12px;height:12px;border-radius:4px;display:block}
+.row-key i.dashed{background:transparent;border:1.5px dashed var(--pot-b)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,14px);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;
+  font-size:13.5px;z-index:60;opacity:0;pointer-events:none;transition:.2s;max-width:92vw}
+.toast[data-show="true"]{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--muted)}
+
+@media (max-width:1100px){
+  .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .grid2{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .top-in,.main{padding-left:16px;padding-right:16px}
+  h1{font-size:26px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .form{grid-template-columns:1fr 1fr}
+  .opts{grid-template-columns:1fr}
+  .tl{--lab:96px}
+  .donut-wrap{grid-template-columns:1fr;justify-items:center}
+  .dl{width:100%}
+  .floor{grid-template-columns:70px minmax(0,1fr) 54px}
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <div class="brand-row">
+    <div class="brand">ARCHITEKTA</div>
+    <div class="range" id="range"></div>
+  </div>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+</div></header>
+<main class="main" id="main"></main>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-live="polite"></aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ======================================================================
+   SUPABASE — проєкт "Production Plan" (окремий, не чіпає інші проєкти)
+   ====================================================================== */
+const SUPABASE_URL = 'https://qzcksigvfmnkwspqbnnt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YebkTfOp_cIP0f7C6td5EA_c3Hr3C6X';
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+function toDbZone(z){
+  return {
+    id:z.id, project_id:z.p, discipline:z.d, floor:z.floor??null, n:z.n, name:z.name,
+    effort:z.effort, rev_effort:z.revEffort??1, status:z.status, assignee_id:z.a??null,
+    earliest:z.earliest, reason:z.reason??null,
+    outsource_cost: z.outsource? z.outsource.cost : null,
+    after_project_id: z.after? z.after.p : null,
+    after_floor: z.after? z.after.floor : null,
+    after_lag: z.after? z.after.lag : null,
+    updated_at: new Date().toISOString(),
+  };
+}
+function fromDbZone(r){
+  return {
+    id:r.id, p:r.project_id, d:r.discipline, floor:r.floor, n:r.n, name:r.name,
+    effort:Number(r.effort), revEffort:Number(r.rev_effort), status:r.status, a:r.assignee_id,
+    earliest:r.earliest, reason:r.reason,
+    outsource: r.outsource_cost!=null? {cost:Number(r.outsource_cost)} : undefined,
+    after: r.after_project_id? {p:r.after_project_id, floor:r.after_floor, lag:r.after_lag} : undefined,
+  };
+}
+async function dbSaveZone(z){ if(!sb||!z) return; const {error}=await sb.from('studio_zones').upsert(toDbZone(z)); if(error) toast('Not saved: '+error.message); }
+async function dbDeleteZone(id){ if(!sb) return; const {error}=await sb.from('studio_zones').delete().eq('id',id); if(error) toast('Not deleted: '+error.message); }
+async function dbSaveProject(p){ if(!sb) return; const {error}=await sb.from('studio_projects').upsert({id:p.id,name:p.name,prio:p.prio,status:p.status,revenue:p.revenue||0}); if(error) toast('Not saved: '+error.message); }
+async function dbSaveRate(m){ if(!sb) return; const {error}=await sb.from('studio_team').update({rate:m.rate}).eq('id',m.id); if(error) toast('Not saved: '+error.message); }
+async function dbSavePotential(pp){ if(!sb) return; const {error}=await sb.from('studio_potentials').update({is_on:pp.on}).eq('id',pp.id); if(error) toast('Not saved: '+error.message); }
+
+/* ======================================================================
+   ДАНІ — заповнюються з Supabase у boot(); порожні масиви до завантаження
+   ====================================================================== */
+const TODAY = new Date('2026-09-21T00:00:00');
+
+const TEAM = [
+  {id:'OL', name:'Olia',    team:'viz', color:'#EDC9CD', rate:2300},
+  {id:'IR', name:'Ira',     team:'viz', color:'#DCD5F0', rate:2100},
+  {id:'EV', name:'Evgeniy', team:'viz', color:'#F1DDB5', rate:1900},
+  {id:'AN', name:'Anton',   team:'wd',  color:'#CBD9EC', rate:2000},
+  {id:'KT', name:'Kate',    team:'wd',  color:'#D3E2DA', rate:1800},
+];
+/* rate = monthly in-house salary, USD. Editable in the Finance tab. */
+const DISC = {
+  viz:{name:'Interior 3D',     short:'3D',       unit:'rooms',    unit1:'room',    role:'Designer',  roles:'Designers',  color:'var(--viz)'},
+  wd: {name:'Working drawings',short:'drawings', unit:'packages', unit1:'package', role:'Architect', roles:'Architects', color:'var(--wd)'},
+};
+let PROJECTS = [
+  {id:'tanger1', name:'Tanger 1',           prio:2, status:'confirmed', revenue:18800},
+  {id:'majed',   name:'Majed',              prio:1, status:'confirmed', revenue:24000},
+  {id:'vida',    name:'Vida',               prio:4, status:'confirmed', revenue:9500},
+  {id:'gunther', name:'Gunther restaurant', prio:3, status:'confirmed', revenue:6000},
+];
+const STATUS = {
+  approved:{lab:'Approved',    col:'var(--appr)',  ink:'var(--appr-t)'},
+  revision:{lab:'Revision',    col:'var(--rev)',   ink:'var(--rev-t)'},
+  paused:  {lab:'Paused',      col:'var(--pause)', ink:'var(--pause-t)'},
+  pending: {lab:'Not started', col:'var(--ns)',    ink:'var(--ink-2)'},
+};
+const REASONS = ['Waiting for client','Waiting for approval','Waiting for information','Internal hold'];
+
+/* ЗОНА = кімната (3D) або пакет креслень. effort — дні на першу версію. */
+let Z = [];
+let seq = 0;
+function zone(o){ Z.push({id:'z'+(++seq), revEffort:1, earliest:iso(TODAY), reason:null, ...o}); }
+const MAP = {A:'approved', R:'revision', P:'paused', N:'pending'};
+function floorRooms(p, floor, code, effort, a, earliest){
+  [...code].forEach((c,i)=>zone({p, d:'viz', floor, n:i+1, name:'Room '+String(i+1).padStart(2,'0'),
+    effort, status:MAP[c], a, earliest, reason: c==='P'?'Waiting for client':null}));
+}
+// Tanger 1 · 33 кімнати
+floorRooms('tanger1','Ground','AAARAAPARNN',2,'OL');
+floorRooms('tanger1','First', 'AARANNNNNPN',2,'OL');
+floorRooms('tanger1','Second','ARNNNNNNNNN',2,'OL');
+zone({p:'tanger1', d:'viz', floor:'Exterior', n:1, name:'Exterior', effort:7, status:'pending', a:'IR', earliest:'2026-10-05', outsource:{cost:1500}});
+// Majed · 3D
+[['1 floor',1,1,'R'],['1 floor',2,2,'A'],['1 floor',3,1,'A'],['1 floor',4,1,'R'],['1 floor',5,1,'R'],['1 floor',6,1,'P'],['1 floor',7,1,'P'],
+ ['2 floor',5,1,'A'],['2 floor',6,1,'A']].forEach(([f,n,e,c])=>zone({p:'majed', d:'viz', floor:f, n, name:'Room '+String(n).padStart(2,'0'),
+   effort:e, status:MAP[c], a:'EV', reason:c==='P'?'Waiting for client':null}));
+// Vida · 3D
+for(let i=1;i<=7;i++) zone({p:'vida', d:'viz', floor:'Ground', n:i, name:'Room '+String(i).padStart(2,'0'), effort:2, status:'pending', a:'IR'});
+// Gunther
+zone({p:'gunther', d:'viz', floor:'Hall', n:1, name:'Dining hall', effort:4, status:'revision', revEffort:2, a:'IR', earliest:'2026-10-19'});
+// Креслення — стартують після 3D поверху + 3 дні на затвердження
+const dep = (p,floor)=>({p, floor, lag:3});
+zone({p:'majed', d:'wd', floor:'Interior', n:1, name:'Interior drawings', effort:17, status:'pending', a:'KT'});
+zone({p:'majed', d:'wd', floor:'Exterior',  n:2, name:'Exterior drawings',  effort:10, status:'pending', a:'KT', earliest:'2026-10-12'});
+zone({p:'vida',    d:'wd', floor:'Ground',  n:1, name:'Drawing set', effort:10,status:'pending', a:'AN', after:dep('vida','Ground')});
+zone({p:'tanger1', d:'wd', floor:'Ground',  n:1, name:'Ground set',  effort:7, status:'pending', a:'KT', after:dep('tanger1','Ground')});
+zone({p:'tanger1', d:'wd', floor:'First',   n:1, name:'First set',   effort:7, status:'pending', a:'KT', after:dep('tanger1','First')});
+zone({p:'tanger1', d:'wd', floor:'AD',      n:1, name:'Arch. details',effort:3, status:'pending', a:'KT'});
+zone({p:'tanger1', d:'wd', floor:'LS',      n:1, name:'Landscape',   effort:3, status:'pending', a:'KT'});
+
+/* ======================================================================
+   ALL-PROJECTS CALCULATOR — той самий шаблон, що у вихідному Excel:
+   3D Interior (floors × rooms × effort) + 3D Exterior + Drawings + Finance.
+   Незалежний від Z/Sx — це проектно-кошторисний рівень, а не операційний.
+   ====================================================================== */
+let CALC = [
+  {id:'c1', name:'Tanger 1', budget:18800, pmFee:700, designRate:115, archRate:90,
+    floors:[{name:'Floor - Sol', rooms:6, eff:2}, {name:'RDC', rooms:5, eff:2}, {name:'Floor - Etage', rooms:9, eff:2}],
+    ext:{zones:1, eff:7}, outsourceExt:null,
+    dwgInt:[{name:'Floor -1', eff:8}, {name:'RDC', eff:8}, {name:'Floor 2', eff:8}],
+    dwgExt:[{name:'AD', eff:5}, {name:'Landscape', eff:5}]},
+  {id:'c2', name:'D10 Palm', budget:30000, pmFee:1000, designRate:115, archRate:90,
+    floors:[{name:'Ground Floor', rooms:7, eff:2}, {name:'1st Floor', rooms:7, eff:2}],
+    ext:{zones:1, eff:7}, outsourceExt:null,
+    dwgInt:[{name:'Ground floor', eff:10}, {name:'1st Floor', eff:10}],
+    dwgExt:[{name:'AD', eff:5}, {name:'Landscape', eff:5}]},
+  {id:'c3', name:'Vida', budget:6380, pmFee:300, designRate:115, archRate:90,
+    floors:[{name:'Floor 30', rooms:8, eff:2}],
+    ext:null, outsourceExt:null,
+    dwgInt:[{name:'WD', eff:20}],
+    dwgExt:[]},
+];
+function calcTotals(c){
+  const designInt = c.floors.reduce((n,f)=>n+f.rooms*f.eff,0);
+  const designExt = c.ext ? c.ext.zones*c.ext.eff : 0;
+  const dwgIntTotal = c.dwgInt.reduce((n,x)=>n+x.eff,0);
+  const dwgExtTotal = c.dwgExt.reduce((n,x)=>n+x.eff,0);
+  const archTotal = dwgIntTotal+dwgExtTotal;
+  const designTotal = designInt+designExt;
+  const extCost = c.outsourceExt ? c.outsourceExt.cost : designExt*c.designRate;
+  const expenses = designInt*c.designRate + extCost + archTotal*c.archRate + c.pmFee;
+  const income = c.budget - expenses;
+  return {designInt, designExt, designTotal, dwgIntTotal, dwgExtTotal, archTotal, extCost, expenses, income};
+}
+
+/* ======================================================================
+   ХЕЛПЕРИ
+   ====================================================================== */
+function iso(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
+const D = s => new Date(s+'T00:00:00');
+const addDays = (d,n)=>{ const x=new Date(d); x.setDate(x.getDate()+n); return x };
+const monday = d =>{ const x=new Date(d); x.setDate(x.getDate()-((x.getDay()+6)%7)); x.setHours(0,0,0,0); return x };
+const isWork = d => d.getDay()!==0 && d.getDay()!==6;
+const fmt = d => d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+function workdays(a,b){ let n=0,d=new Date(a); while(d<=b){ if(isWork(d)) n++; d=addDays(d,1);} return n }
+const person = id => TEAM.find(m=>m.id===id) || {id:'?', name:'—', color:'var(--ns)'};
+const proj = id => PROJECTS.find(p=>p.id===id) || {id:id, name:id, prio:9, status:'confirmed'};
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const state = {
+  tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null,
+  sim:{name:'Tanger 2', effort:30, team:'viz', ran:true, pick:0},
+  cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
+  potentials:[
+    {id:'p1', name:'Tanger 2',  effort:30, team:'viz', revenue:26000, on:false},
+    {id:'p2', name:'New Villa', effort:20, team:'wd',  revenue:15000, on:false},
+  ],
+  calcBuffer:1.5,
+};
+function activePotentials(){ return state.potentials.filter(p=>p.on) }
+/* віртуальні зони потенційних проєктів — накладаються на реальний календар, нічого не змінюючи в Z */
+function potentialExtraZones(){
+  const extra=[];
+  activePotentials().forEach(pp=>{
+    const sc = scenarios(pp.effort, pp.team)[0];
+    if(!sc) return;
+    Object.entries(sc.r.by).forEach(([pid,days])=>{
+      extra.push({id:'pot-'+pp.id+'-'+pid, p:'__pot_'+pp.id, d:pp.team, floor:'Potential', n:1,
+        name:pp.name, effort:days.length, status:'pending', a:pid, earliest:days[0], potential:true});
+    });
+  });
+  return extra;
+}
+function buildScenario(){ return build(potentialExtraZones()) }
+function range(){
+  const start = addDays(monday(TODAY), state.offset*7);
+  return {start, end:addDays(start, 69), weeks:10};
+}
+
+/* ======================================================================
+   ДВИГУН: effort → календар кожної людини
+   ====================================================================== */
+function active(z){
+  if(z.outsource) return 0;                              // не займає внутрішній календар
+  if(z.status==='approved' || z.status==='paused') return 0;
+  if(z.status==='revision') return z.revEffort||1;
+  return z.effort;
+}
+function floorOrder(f){ return ({'Ground':1,'1 floor':1,'First':2,'2 floor':2,'Second':3,'Exterior':4,'Hall':1,'AD':5,'LS':6})[f]||9 }
+
+let S;
+function build(extra=[]){
+  const items = [...Z, ...extra].map(z=>({...z, rem:active(z), days:[], fin:null}));
+  const occ = {}; TEAM.forEach(m=>occ[m.id]=new Map());
+  const floorDone = (p, floor) => {
+    const g = items.filter(x=>x.p===p && x.d==='viz' && x.floor===floor && x.status!=='paused');
+    if(g.some(x=>x.rem>0)) return null;
+    const f = g.map(x=>x.fin).filter(Boolean);
+    return f.length ? f.reduce((a,x)=>D(x)>D(a)?x:a) : iso(addDays(TODAY,-4));
+  };
+  const ready = (it, day) => {
+    if(it.rem<=0 || D(it.earliest)>day) return false;
+    if(!it.after) return true;
+    const f = floorDone(it.after.p, it.after.floor);
+    return f && addDays(D(f), it.after.lag) < day;
+  };
+  for(let k=0;k<260;k++){
+    const day = addDays(TODAY,k);
+    if(!isWork(day)) continue;
+    const key = iso(day);
+    TEAM.forEach(m=>{
+      const c = items.filter(x=>x.a===m.id && ready(x,day));
+      if(!c.length) return;
+      c.sort((a,b)=>(proj(a.p).prio-proj(b.p).prio) || (floorOrder(a.floor)-floorOrder(b.floor)) || (a.n-b.n));
+      const it = c[0];
+      it.days.push(key); it.rem--; occ[m.id].set(key, it.id);
+      if(it.rem===0) it.fin = key;
+    });
+  }
+  items.forEach(x=>{ if(x.days.length){ x.s=x.days[0]; x.e=x.days[x.days.length-1]; } });
+  return {items, occ, byId:new Map(items.map(x=>[x.id,x]))};
+}
+function recalc(){ S = build(); render(); }
+
+/* зобовʼязання по набору зон */
+function breakdown(list){
+  const by = st => list.filter(z=>z.status===st);
+  const w  = arr => arr.reduce((n,z)=>n+z.effort,0);
+  const appr=by('approved'), rev=by('revision'), pau=by('paused'), pen=by('pending');
+  return {
+    total:list.length, totalW:w(list),
+    appr:appr.length, apprW:w(appr),
+    rev:rev.length, revW:rev.reduce((n,z)=>n+(z.revEffort||1),0),
+    pau:pau.length, pauW:w(pau),
+    pen:pen.length, penW:w(pen),
+    remaining: rev.length+pau.length+pen.length,
+    left: rev.reduce((n,z)=>n+(z.revEffort||1),0) + w(pen),
+  };
+}
+function finishOf(list){
+  const e = list.map(z=>S.byId.get(z.id)).filter(x=>x&&x.e).map(x=>x.e);
+  return e.length ? e.reduce((a,x)=>D(x)>D(a)?x:a) : null;
+}
+/* суцільні блоки роботи людини: один проєкт·дисципліна поспіль */
+function blocksOf(id, extraOcc){
+  const r = range(), out=[];
+  let cur=null, d=new Date(r.start);
+  while(d<=r.end){
+    if(isWork(d)){
+      const key=iso(d);
+      const zid = S.occ[id].get(key);
+      const z = zid ? S.byId.get(zid) : (extraOcc && extraOcc.has(key) ? {p:'__pot', d:'pot', floor:''} : null);
+      const tag = z ? z.p+'|'+z.d : null;
+      if(tag && cur && cur.tag===tag){ cur.e=key; cur.days++; cur.floors[z.floor]=(cur.floors[z.floor]||0)+1; }
+      else if(tag){ cur={tag, p:z.p, d:z.d, s:key, e:key, days:1, floors:{[z.floor]:1}}; out.push(cur); }
+      else cur=null;
+    }
+    d=addDays(d,1);
+  }
+  // склеїти блоки одного проєкту, розділені лише вихідними
+  const merged=[];
+  out.forEach(b=>{
+    const l=merged[merged.length-1];
+    if(l && l.tag===b.tag && workdays(addDays(D(l.e),1), addDays(D(b.s),-1))===0){
+      l.e=b.e; l.days+=b.days; Object.entries(b.floors).forEach(([f,n])=>l.floors[f]=(l.floors[f]||0)+n);
+    } else merged.push(b);
+  });
+  return merged;
+}
+function freeFrom(id){
+  let d=new Date(TODAY);
+  for(let k=0;k<200;k++){
+    if(isWork(d)){
+      let busy=false, x=new Date(d);
+      for(let j=0;j<5;j++){ while(!isWork(x)) x=addDays(x,1); if(S.occ[id].has(iso(x))){busy=true;break;} x=addDays(x,1); }
+      if(!busy) return d;
+    }
+    d=addDays(d,1);
+  }
+  return null;
+}
+function remainingOf(id){ return S.items.filter(x=>x.a===id).reduce((n,x)=>n+active(x),0) }
+
+/* суцільні вільні проміжки людини від сьогодні */
+function gapsOf(id){
+  const out=[]; let cur=null, d=new Date(TODAY);
+  for(let i=0;i<300;i++){
+    if(isWork(d)){
+      if(!S.occ[id].has(iso(d))){ if(cur) cur.e=new Date(d); else cur={s:new Date(d), e:new Date(d)}; }
+      else if(cur){ out.push(cur); cur=null; }
+    }
+    d=addDays(d,1);
+  }
+  if(cur) out.push(cur);
+  return out.map(g=>({...g, days:workdays(g.s,g.e)}));
+}
+/* розмістити effort одним суцільним блоком у першому вікні, що вміщає */
+function continuousPlan(id, effort){
+  const g = gapsOf(id).find(x=>x.days>=effort);
+  if(!g) return null;
+  const days=[]; let d=new Date(g.s), n=0;
+  while(n<effort){ if(isWork(d)){ days.push(iso(d)); n++; } d=addDays(d,1); }
+  return {days, start:days[0], finish:days[days.length-1], segs:[{s:days[0], e:days[days.length-1]}]};
+}
+/* розмістити effort у чергу вільних днів — заповнює прогалини, може розірватись */
+function splitPlan(id, effort){
+  const days = freeDays(id, TODAY, addDays(TODAY,300)).slice(0,effort).map(d=>iso(d));
+  if(days.length<effort) return null;
+  const segs=[]; let cur=null;
+  days.forEach(k=>{
+    if(cur && workdays(addDays(D(cur.e),1), addDays(D(k),-1))===0) cur.e=k;
+    else { cur={s:k,e:k}; segs.push(cur); }
+  });
+  return {days, start:days[0], finish:days[days.length-1], segs};
+}
+function potBars(p){
+  const out = p.segs.map(sg=>bar(sg.s, sg.e, {cls:'pot sm', top:30, text:`${workdays(D(sg.s),D(sg.e))}d`}));
+  for(let i=1;i<p.segs.length;i++){
+    const a=addDays(D(p.segs[i-1].e),1), b=addDays(D(p.segs[i].s),-1);
+    if(a>b) continue;
+    const pp=pct(iso(a),iso(b)); if(!pp) continue;
+    out.push(`<div class="bar gap-note sm" style="left:${pp.left}%;width:calc(${pp.width}% - 3px);top:30px">resumes ${fmt(D(p.segs[i].s))}</div>`);
+  }
+  return out.join('');
+}
+
+/* ---------- симуляція потенційного проєкту ---------- */
+function freeDays(id, from, to){
+  const out=[]; let d=new Date(from);
+  while(d<=to){ if(isWork(d) && !S.occ[id].has(iso(d))) out.push(new Date(d)); d=addDays(d,1); }
+  return out;
+}
+function simulate(effort, ids){
+  const pool=[];
+  ids.forEach(id=>freeDays(id, TODAY, addDays(TODAY,300)).forEach(d=>pool.push({d,id})));
+  pool.sort((a,b)=>a.d-b.d || ids.indexOf(a.id)-ids.indexOf(b.id));
+  if(pool.length<effort || effort<=0) return null;
+  const used=pool.slice(0,effort), by={};
+  used.forEach(u=>(by[u.id]=by[u.id]||[]).push(iso(u.d)));
+  return {start:iso(used[0].d), finish:iso(used[used.length-1].d), by, ids:Object.keys(by)};
+}
+function scenarios(effort, team){
+  const ids = TEAM.filter(m=>m.team===team).map(m=>m.id);
+  const all = simulate(effort, ids);
+  let pair=null;
+  for(let i=0;i<ids.length;i++) for(let j=i+1;j<ids.length;j++){
+    const r=simulate(effort,[ids[i],ids[j]]); if(r && (!pair || D(r.finish)<D(pair.finish))) pair=r;
+  }
+  let one=null;
+  ids.forEach(id=>{ const r=simulate(effort,[id]); if(r && (!one || D(r.finish)<D(one.finish))) one=r; });
+  const list = [
+    all  && {key:'all',  title:'Earliest · whole team', r:all},
+    pair && {key:'pair', title:'Two people',            r:pair},
+    one  && {key:'one',  title:'One person',            r:one},
+  ].filter(Boolean);
+  // однакові сценарії (коли вільні лише двоє) показуємо один раз
+  const seen=new Set();
+  return list.filter(o=>{ const k=o.r.ids.slice().sort().join('+')+o.r.finish; if(seen.has(k)) return false; seen.add(k); return true; });
+}
+
+/* ======================================================================
+   ФІНАНСИ: у монтажах — ставка/day = зарплата/робочі дні цього місяця
+   ====================================================================== */
+function workdaysInMonth(y,m){ return workdays(new Date(y,m,1), new Date(y,m+1,0)) }
+function ym(dateStr){ const d=D(dateStr); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0') }
+function ymLabel(k){ const [y,m]=k.split('-').map(Number); return new Date(y,m-1,1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'}) }
+function dailyRate(id, k){
+  const [y,m]=k.split('-').map(Number);
+  const wd = workdaysInMonth(y,m-1) || 21;
+  return (person(id).rate||0)/wd;
+}
+/* нинішній «номінальний» день-рейт — для ще незапланованих (paused/без ресурсу) зон */
+function nominalRate(id){ return (person(id).rate||0)/21 }
+
+/* {ym: {inhouse, outsource, total, byPerson:[{id,days,cost}], byOutsource:[{name,cost}]}} по проєкту, з рушія Sx */
+function monthlyCost(pid, Sx){
+  Sx = Sx || S;
+  const months = {};
+  const touch = k => months[k] || (months[k]={inhouse:0, outsource:0, byPerson:{}, byOutsource:[]});
+  Sx.items.filter(x=>x.p===pid && !x.outsource).forEach(it=>{
+    (it.days||[]).forEach(day=>{
+      const k=ym(day), mm=touch(k), c=dailyRate(it.a,k);
+      mm.inhouse+=c;
+      mm.byPerson[it.a]=(mm.byPerson[it.a]||0)+c;
+    });
+  });
+  Z.filter(z=>z.p===pid && z.outsource).forEach(z=>{
+    const k=ym(z.earliest), mm=touch(k);
+    mm.outsource+=z.outsource.cost;
+    mm.byOutsource.push({name:z.name, who:z.a, cost:z.outsource.cost});
+  });
+  Object.values(months).forEach(mm=>mm.total=mm.inhouse+mm.outsource);
+  return months;
+}
+function projectCost(pid, Sx){
+  const months = monthlyCost(pid, Sx);
+  const scheduled = Object.values(months).reduce((n,m)=>n+m.total,0);
+  // paused зони не мають днів у Sx (виключені з календаря) — рахуємо їх номінально, окремо
+  const pausedNominal = Z.filter(z=>z.p===pid && z.status==='paused' && !z.outsource)
+    .reduce((n,z)=>n+z.effort*nominalRate(z.a),0);
+  return {scheduled, pausedNominal, total:scheduled+pausedNominal};
+}
+function projectFinance(pid, Sx){
+  const p = proj(pid), cost = projectCost(pid, Sx);
+  const revenue = p.revenue||0;
+  return {revenue, cost:cost.total, margin:revenue-cost.total,
+    coverage: revenue - cost.total, ok: revenue>=cost.total, breakdown:cost};
+}
+/* скільки коштує конкретна зона: факт (якщо заплановано), інакше оцінка */
+function zoneCostEstimate(z, Sx){
+  Sx = Sx || S;
+  if(z.outsource) return z.outsource.cost;
+  if(z.status==='approved') return 0;
+  const it = Sx.byId.get(z.id);
+  if(it && it.days && it.days.length) return it.days.reduce((n,day)=>n+dailyRate(it.a,ym(day)),0);
+  if(!z.a) return 0;
+  const eff = z.status==='revision' ? (z.revEffort||1) : z.effort;
+  return eff * nominalRate(z.a);
+}
+function money(n){ return '$'+Math.round(n).toLocaleString('en-US') }
+
+/* ======================================================================
+   ТАЙМЛАЙН
+   ====================================================================== */
+function pct(a,b){
+  const r=range(), total=(r.end-r.start)/864e5+1;
+  const s=new Date(Math.max(D(a),r.start)), e=new Date(Math.min(D(b),r.end));
+  if(e<s) return null;
+  return {left:(s-r.start)/864e5/total*100, width:((e-s)/864e5+1)/total*100};
+}
+function tlHead(label){
+  const r=range(), w=[];
+  for(let i=0;i<r.weeks;i++) w.push(fmt(addDays(r.start,i*7)));
+  return `<div class="tl-head"><div>${label}</div><div class="tl-weeks">${w.map(x=>`<span>${x}</span>`).join('')}</div></div>`;
+}
+function grid(){
+  const r=range(), t=pct(iso(TODAY),iso(TODAY));
+  return `<div class="gl">${Array.from({length:r.weeks},()=>'<i></i>').join('')}</div>${t?`<div class="today" style="left:${t.left}%"></div>`:''}`;
+}
+function bar(a,b,{cls='',bg='',text='',top=11,data='',title=''}={}){
+  const p=pct(a,b); if(!p) return '';
+  return `<div class="bar ${cls}" ${data} title="${esc(title||text)}" style="left:${p.left}%;width:calc(${p.width}% - 3px);top:${top}px;${bg?`background:${bg};`:''}">${text}</div>`;
+}
+
+/* ======================================================================
+   VIEW 1 · PROJECT PRODUCTION
+   ====================================================================== */
+function viewProduction(){
+  const pr = proj(state.project), dc = DISC[state.disc];
+  const zones = Z.filter(z=>z.p===pr.id && z.d===state.disc);
+  const b = breakdown(zones);
+  const fin = finishOf(zones);
+  const projects = PROJECTS.filter(p=>Z.some(z=>z.p===p.id));
+  const floors = [...new Set(zones.map(z=>z.floor))].sort((a,b)=>floorOrder(a)-floorOrder(b));
+
+  return `
+  <div class="head">
+    <h1>${esc(pr.name)} · ${dc.name}</h1>
+    <div class="spacer"></div>
+    <div class="seg">${Object.entries(DISC).map(([k,v])=>`<button data-disc="${k}" aria-pressed="${state.disc===k}">${v.short==='3D'?'3D':'Drawings'}</button>`).join('')}</div>
+    <select class="sel" id="projSel">${projects.map(p=>`<option value="${p.id}" ${p.id===pr.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">Total ${dc.unit}</div><div class="v">${b.total}</div><div class="f">${b.totalW} ${dc.role.toLowerCase()}-days planned</div></div>
+    <div class="kpi"><div class="l">${state.disc==='viz'?'Design approved':'Approved'}</div><div class="v">${b.appr}</div><div class="f">${b.apprW} days of work closed</div></div>
+    <div class="kpi"><div class="l">${dc.unit[0].toUpperCase()+dc.unit.slice(1)} remaining</div><div class="v">${b.remaining}</div><div class="f">${b.rev} revision · ${b.pau} paused · ${b.pen} new</div></div>
+    <div class="kpi"><div class="l">${dc.role} effort left</div><div class="v">${b.left} days</div><div class="f">${b.pauW? `+ ${b.pauW} days on hold`:'nothing on hold'}</div></div>
+    <div class="kpi"><div class="l">Forecast finish</div><div class="v">${fin?fmt(D(fin)):(b.left?'—':'Done')}</div><div class="f">${fin? 'from the team calendar' : b.left? 'no one assigned':'all approved'}</div></div>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <div class="card-h"><h2>${dc.unit[0].toUpperCase()+dc.unit.slice(1)} by floor</h2><span class="hint">1 square = 1 ${dc.unit1} · tap to edit</span></div>
+      <div class="card-b">
+        ${floors.map(f=>{
+          const fz = zones.filter(z=>z.floor===f).sort((a,b)=>a.n-b.n);
+          const done = fz.filter(z=>z.status==='approved').length;
+          const left = fz.reduce((n,z)=>n+active(z),0);
+          return `<div class="floor">
+            <div><div class="fn">${esc(f)}</div><div class="fc">${done} / ${fz.length} approved${fz.some(z=>z.outsource)?' · <span style=\"color:var(--pot-t)\">outsourced</span>':''}</div></div>
+            <div class="pills">${fz.map(z=>`<button class="pill ${z.status} ${state.selZone===z.id?'sel':''}" data-zone="${z.id}"
+                title="${esc(z.name)} · ${STATUS[z.status].lab} · ${z.effort}d${z.a?' · '+person(z.a).name:''}">${state.disc==='viz'&&/^Room/.test(z.name)?String(z.n).padStart(2,'0'):esc(z.name)}</button>`).join('')}
+              <button class="pill add" data-add="${esc(f)}" title="Add ${dc.unit1}">+</button></div>
+            <div class="left">${left? left+'d left' : '<span style="color:var(--appr-t)">done</span>'}</div>
+          </div>`;
+        }).join('') || '<div class="muted">No work in this discipline yet.</div>'}
+        <div class="legend">
+          <span><i style="background:var(--appr)"></i>Approved</span>
+          <span><i style="background:var(--rev)"></i>Revision</span>
+          <span><i style="background:var(--pause)"></i>Paused</span>
+          <span><i style="background:var(--ns);border:1px dashed var(--ns-b)"></i>Not started</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>${state.disc==='viz'?'Visualisation':'Drawings'} progress</h2><span class="hint">effort, not calendar</span></div>
+      <div class="card-b">${donut(b, dc)}</div>
+    </section>
+  </div>
+
+  ${financeCard(pr.id)}
+
+  <section class="card">
+    <div class="card-h"><h2>Who works when</h2><span class="hint">the system converts ${dc.unit1} effort into ${dc.roles.toLowerCase()} availability</span></div>
+    <div class="card-b tl">
+      ${tlHead(dc.role)}
+      ${TEAM.filter(m=>m.team===state.disc).map(m=>{
+        const bl = blocksOf(m.id);
+        const ff = freeFrom(m.id);
+        return `<div class="tl-row"><div class="tl-lab">${m.name}<small>${remainingOf(m.id)}d assigned</small></div>
+          <div class="track">${grid()}
+            ${bl.map(x=>{
+              const mine = x.p===pr.id && x.d===state.disc;
+              const label = mine
+                ? Object.entries(x.floors).sort((a,b)=>floorOrder(a[0])-floorOrder(b[0])).map(([f,n])=>`${f} · ${n}d`).join(' + ')
+                : `${proj(x.p).name}${x.d==='wd'?' drawings':''}`;
+              return bar(x.s,x.e,{bg: mine? dc.color : m.color, cls: mine?'':'dim', text:esc(label), title:`${proj(x.p).name} · ${x.days} days · ${fmt(D(x.s))}–${fmt(D(x.e))}`});
+            }).join('')}
+            ${ff && (()=>{ const p=pct(iso(ff),iso(ff)); return p? `<div class="bar ghost" style="left:${p.left}%;top:11px">Free from ${fmt(ff)}</div>`:''; })()}
+          </div></div>`;
+      }).join('')}
+    </div>
+  </section>`;
+}
+function financeCard(pid){
+  const p = proj(pid);
+  const fz = projectFinance(pid, S);
+  const months = monthlyCost(pid, S);
+  const keys = Object.keys(months).sort();
+  const people = [...new Set(S.items.filter(x=>x.p===pid && !x.outsource).map(x=>x.a))].filter(Boolean);
+  const outsourced = Z.filter(z=>z.p===pid && z.outsource);
+  return `<section class="card" style="margin-top:16px">
+    <div class="card-h"><h2>Project finance</h2><span class="hint">what remains to build vs. what the client still owes</span></div>
+    <div class="card-b">
+      <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+        <div class="kpi"><div class="l">Contracted revenue</div><div class="v">${money(fz.revenue)}</div><div class="f">agreed with the client</div></div>
+        <div class="kpi"><div class="l">Cost to finish</div><div class="v">${money(fz.cost)}</div>
+          <div class="f">${fz.breakdown.pausedNominal? money(fz.breakdown.pausedNominal)+' of it paused/estimated':'fully scheduled'}</div></div>
+        <div class="kpi ${fz.ok?'':'warn'}"><div class="l">Projected margin</div><div class="v">${money(fz.margin)}</div>
+          <div class="f">${fz.ok? 'revenue covers remaining cost' : 'remaining cost exceeds revenue'}</div></div>
+        <div class="kpi"><div class="l">Outsourced</div><div class="v">${outsourced.length}</div>
+          <div class="f">${outsourced.length? money(outsourced.reduce((n,z)=>n+z.outsource.cost,0))+' flat fees':'nothing outsourced'}</div></div>
+      </div>
+      <div class="banner ${fz.ok?'ok':'warn'}">${fz.ok
+        ? `Remaining income ${money(fz.coverage)} is enough to cover the ${money(fz.cost)} still needed to finish ${esc(p.name)}.`
+        : `Remaining cost ${money(fz.cost)} is ${money(-fz.coverage)} more than what's left of the ${money(fz.revenue)} contract — margin is negative.`}</div>
+
+      ${keys.length? `<div style="margin-top:20px">
+        <div class="fin-head"><div>Month</div>${people.map(id=>`<div>${person(id).name}</div>`).join('')}${people.length<4?Array.from({length:4-people.length},()=>'<div></div>').join(''):''}</div>
+        ${keys.map(k=>{
+          const mm=months[k];
+          return `<div class="finrow" style="grid-template-columns:1.3fr repeat(${Math.max(people.length,1)},minmax(0,1fr))">
+            <div><div class="nm">${ymLabel(k)}</div><div class="sub">${money(mm.total)}${mm.outsource?` · ${money(mm.outsource)} outsourced`:''}</div></div>
+            ${people.map(id=>{
+              const c=mm.byPerson[id]; if(!c) return '<div class="num muted">—</div>';
+              return `<div class="num"><span class="stack-chip">${money(c)}<small>${Math.round(c/dailyRate(id,k))}d</small></span></div>`;
+            }).join('')}
+          </div>`;
+        }).join('')}
+      </div>`:''}
+
+      ${outsourced.length? `<div class="note" style="margin-top:18px"><b>Outsourced scope</b>
+        ${outsourced.map(z=>`${esc(z.name)} → ${person(z.a).name} (external) · ${money(z.outsource.cost)} flat, booked ${fmt(D(z.earliest))}`).join('<br>')}</div>`:''}
+    </div></section>`;
+}
+
+function donut(b, dc){
+  const seg=[['approved',b.appr],['revision',b.rev],['paused',b.pau],['pending',b.pen]];
+  const R=62, C=2*Math.PI*R, total=b.total||1;
+  let off=0;
+  const arcs = seg.map(([k,n])=>{
+    const len=n/total*C, a=`<circle r="${R}" cx="85" cy="85" fill="none" stroke="${STATUS[k].col}" stroke-width="26"
+      stroke-dasharray="${len} ${C-len}" stroke-dashoffset="${-off}" transform="rotate(-90 85 85)"/>`;
+    off+=len; return a;
+  }).join('');
+  const row=(k,lab,n,w)=>`<div class="r"><i style="background:${STATUS[k].col}${k==='pending'?';border:1px dashed var(--ns-b)':''}"></i>
+    <span class="n">${lab}</span><b>${n} ${n===1?dc.unit1:dc.unit}</b><span class="s">${w} days</span></div>`;
+  return `<div class="donut-wrap">
+    <svg class="donut" viewBox="0 0 170 170" role="img" aria-label="${b.appr} of ${b.total} approved">
+      <circle r="${R}" cx="85" cy="85" fill="none" stroke="var(--line-2)" stroke-width="26"/>${arcs}
+      <text x="85" y="92" text-anchor="middle" font-size="24" fill="var(--ink)">${b.appr} / ${b.total}</text>
+    </svg>
+    <div class="dl">
+      ${row('approved','Approved',b.appr,b.apprW)}
+      ${row('revision','Revision',b.rev,b.revW)}
+      ${row('paused','Paused',b.pau,b.pauW)}
+      ${row('pending','Not started',b.pen,b.penW)}
+      <div class="r"><i style="background:var(--ink)"></i><span class="n"><b>Remaining effort</b></span><b>${b.remaining} ${dc.unit}</b>
+        <span class="s">${b.left} days to do${b.pauW?` · ${b.pauW} on hold`:''}</span></div>
+    </div></div>`;
+}
+
+/* ======================================================================
+   VIEW 2 · STUDIO LOAD
+   ====================================================================== */
+function viewLoad(){
+  const r = range();
+  const live = Z.filter(z=>proj(z.p).status==='confirmed');
+  const confirmed = live.reduce((n,z)=>n+active(z),0);
+  const inRange = workdays(new Date(Math.max(TODAY,r.start)), r.end);
+  const capacity = TEAM.length * inRange;
+  const busyIn = TEAM.reduce((n,m)=>n+[...S.occ[m.id].keys()].filter(k=>D(k)>=r.start&&D(k)<=r.end).length,0);
+  const free = capacity - busyIn;
+  const slots = TEAM.map(m=>({m, d:freeFrom(m.id)})).filter(x=>x.d).sort((a,b)=>a.d-b.d);
+  const over = TEAM.map(m=>({m, n:remainingOf(m.id)-inRange})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+
+  // рядки: проєкт · дисципліна
+  const stages=[];
+  PROJECTS.forEach(p=>Object.keys(DISC).forEach(d=>{
+    const zs=Z.filter(z=>z.p===p.id&&z.d===d); if(!zs.length) return;
+    stages.push({p, d, zs, b:breakdown(zs)});
+  }));
+  stages.sort((a,b)=>a.p.prio-b.p.prio || (a.d==='viz'?-1:1));
+
+  return `
+  <div class="head"><h1>Studio load · all projects</h1></div>
+  <div class="kpis">
+    <div class="kpi"><div class="l">Confirmed effort</div><div class="v">${confirmed} days</div><div class="f">left in confirmed projects</div></div>
+    <div class="kpi"><div class="l">Capacity</div><div class="v">${capacity} days</div><div class="f">${TEAM.length} people · ${inRange} working days</div></div>
+    <div class="kpi"><div class="l">Free capacity</div><div class="v">${free} days</div><div class="f">unassigned till ${fmt(r.end)}</div></div>
+    <div class="kpi"><div class="l">First team slot</div><div class="v">${slots[0]?fmt(slots[0].d):'—'}</div><div class="f">${slots[0]?slots[0].m.name+' · a free week':'no free week'}</div></div>
+    <div class="kpi ${over.length?'warn':''}"><div class="l">Overloaded</div><div class="v">${over.length? over[0].m.name+' +'+over[0].n+'d':'No one'}</div>
+      <div class="f">${over.length? 'work beyond '+fmt(r.end) : 'everything fits the window'}</div></div>
+  </div>
+
+  <section class="card" style="margin-bottom:16px">
+    <div class="card-h"><h2>Projects × weeks</h2><span class="hint">one line = one project stage · bar = who and how many days</span></div>
+    <div class="card-b tl" style="--lab:210px">
+      ${tlHead('Project stage')}
+      ${stages.map(st=>{
+        const people=[...new Set(st.zs.map(z=>z.a).filter(Boolean))];
+        const rows = people.map(id=>{
+          const days = S.items.filter(x=>x.p===st.p.id&&x.d===st.d&&x.a===id).flatMap(x=>x.days).sort();
+          return {id, days};
+        }).filter(x=>x.days.length);
+        const h = Math.max(1,rows.length)*42+12;
+        return `<div class="tl-row" style="min-height:${h}px">
+          <div class="tl-lab">${esc(st.p.name)} · ${DISC[st.d].short}<small>${st.b.remaining} ${DISC[st.d].unit} · ${st.b.left}d left${st.b.pau?` · ${st.b.pau} paused`:''}</small></div>
+          <div class="track" style="min-height:${h}px">${grid()}
+            ${rows.map((x,i)=>bar(x.days[0], x.days[x.days.length-1], {bg:person(x.id).color, top:10+i*42,
+              text:`${person(x.id).name} · ${x.days.length}d`, data:`data-goto="${st.p.id}|${st.d}"`})).join('')}
+            ${!rows.length? `<div class="bar ghost" style="left:0;top:11px">${st.b.left? 'no one assigned' : 'all approved'}</div>`:''}
+          </div></div>`;
+      }).join('')}
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-h"><h2>Team capacity</h2><span class="hint">colour = project · empty = free</span></div>
+    <div class="card-b tl">
+      ${tlHead('Person')}
+      ${TEAM.map(m=>{
+        const bl=blocksOf(m.id), used=bl.reduce((n,x)=>n+x.days,0);
+        return `<div class="tl-row"><div class="tl-lab">${m.name}<small>${DISC[m.team].role} · ${Math.round(used/inRange*100)}% loaded</small></div>
+          <div class="track">${grid()}
+            ${bl.map(x=>bar(x.s,x.e,{bg:(x.d==='viz'?'var(--viz)':'var(--wd)'), text:`${esc(proj(x.p).name)} · ${x.days}d`, data:`data-goto="${x.p}|${x.d}"`})).join('')}
+          </div></div>`;
+      }).join('')}
+    </div>
+  </section>`;
+}
+
+/* ======================================================================
+   VIEW 3 · POTENTIAL PROJECT
+   ====================================================================== */
+function viewPotential(){
+  const sm = state.sim, r = range();
+  const opts = sm.ran ? scenarios(+sm.effort||0, sm.team) : [];
+  const pick = opts[Math.min(sm.pick, opts.length-1)];
+  const beyond = pick && D(pick.r.finish) > r.end;
+  const extraOcc = {};
+  if(pick) Object.entries(pick.r.by).forEach(([id,days])=>extraOcc[id]=new Set(days));
+  const people = TEAM.filter(m=>m.team===sm.team);
+  const confEnd = people.map(m=>[...S.occ[m.id].keys()].sort().pop()).filter(Boolean).sort().pop();
+
+  return `
+  <div class="head"><h1>Potential project simulator</h1></div>
+  <section class="card" style="margin-bottom:16px">
+    <div class="card-h"><h2>Add project without changing the real plan</h2><span class="hint">simulation</span></div>
+    <div class="card-b">
+      <div class="form">
+        <div><label for="simName">Project</label><input id="simName" value="${esc(sm.name)}"></div>
+        <div><label for="simEff">Required effort, days</label><input id="simEff" type="number" min="1" value="${sm.effort}"></div>
+        <div><label for="simTeam">Team</label><select id="simTeam">
+          <option value="viz" ${sm.team==='viz'?'selected':''}>Designers</option>
+          <option value="wd" ${sm.team==='wd'?'selected':''}>Architects</option></select></div>
+        <button class="btn" data-simulate>Simulate</button>
+      </div>
+
+      ${pick? `
+      <div class="tl" style="--lab:130px;margin-top:22px">
+        <div class="tl-row" style="border:0">
+          <div class="tl-lab">Current work</div>
+          <div class="track">${grid()}
+            ${confEnd? bar(iso(TODAY), confEnd, {bg:'var(--viz)', text:'Confirmed studio load'}):''}
+          </div></div>
+        <div class="tl-row" style="border:0">
+          <div class="tl-lab">Potential</div>
+          <div class="track">${grid()}${bar(pick.r.start, pick.r.finish, {cls:'pot', text:`${esc(sm.name)} · ${sm.effort} ${DISC[sm.team].role.toLowerCase()}-days`})}</div></div>
+      </div>
+      <div class="opts">${opts.map((o,i)=>`<button class="opt" data-pick="${i}" aria-pressed="${o===pick}">
+          <div class="t">${o.title}</div><div class="d">${fmt(D(o.r.start))} → ${fmt(D(o.r.finish))}</div>
+          <div class="w">${o.r.ids.map(id=>person(id).name).join(' + ')} · ${workdays(D(o.r.start),D(o.r.finish))} working days</div></button>`).join('')}</div>
+      <div class="banner ${beyond?'warn':'ok'}">
+        Earliest start: ${fmt(D(pick.r.start))} · Forecast finish: ${fmt(D(pick.r.finish))} ·
+        ${beyond? `Runs ${workdays(addDays(r.end,1), D(pick.r.finish))} working days past ${fmt(r.end)} — consider an extra ${DISC[sm.team].role.toLowerCase()}` : 'No additional hire required'}
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn" data-confirm>Confirm plan</button>
+        <span class="muted" style="align-self:center;font-size:13px">Nothing changes in production until you confirm.</span>
+      </div>` : `<div class="note">Enter the effort and press Simulate.</div>`}
+    </div>
+  </section>
+
+  ${pick? `<section class="card">
+    <div class="card-h"><h2>Capacity after adding ${esc(sm.name)}</h2><span class="hint">the dashed block shows the potential project</span></div>
+    <div class="card-b tl">
+      ${tlHead(DISC[sm.team].role)}
+      ${people.map(m=>{
+        const bl = blocksOf(m.id, extraOcc[m.id]);
+        return `<div class="tl-row"><div class="tl-lab">${m.name}<small>${extraOcc[m.id]? extraOcc[m.id].size+'d on '+esc(sm.name) : 'not used'}</small></div>
+          <div class="track">${grid()}
+            ${bl.map(x=> x.p==='__pot'
+              ? bar(x.s,x.e,{cls:'pot', text:esc(sm.name)})
+              : bar(x.s,x.e,{bg:m.color, text:'Confirmed', title:`${proj(x.p).name} · ${x.days}d`})).join('')}
+          </div></div>`;
+      }).join('')}
+    </div></section>`:''}`;
+}
+
+/* ======================================================================
+   VIEW 4 · RESOURCE CALENDAR
+   ====================================================================== */
+function viewCalendar(){
+  const c = state.cal, dc = DISC[c.team];
+  const people = TEAM.filter(m=>m.team===c.team);
+  const plans = {}; people.forEach(m=>{ plans[m.id] = c.mode==='block' ? continuousPlan(m.id,c.effort) : splitPlan(m.id,c.effort); });
+  const ranked = people.map(m=>({m, p:plans[m.id]})).filter(x=>x.p).sort((a,b)=>D(a.p.finish)-D(b.p.finish));
+  const best = ranked[0];
+
+  return `
+  <div class="head"><h1>Resource calendar</h1></div>
+  <section class="card" style="margin-bottom:16px">
+    <div class="card-h"><h2>Where does the next project fit?</h2><span class="hint">overlay a calculated effort onto real calendars, person by person</span></div>
+    <div class="card-b">
+      <div class="form">
+        <div><label for="calName">Project name</label><input id="calName" value="${esc(c.name)}"></div>
+        <div><label for="calEff">Required effort, days</label><input id="calEff" type="number" min="1" value="${c.effort}"></div>
+        <div><label for="calTeam">Discipline</label><select id="calTeam">
+          <option value="viz" ${c.team==='viz'?'selected':''}>Designers</option>
+          <option value="wd" ${c.team==='wd'?'selected':''}>Architects</option></select></div>
+        <button class="btn" data-calrun>Update</button>
+      </div>
+      <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span class="muted" style="font-size:13px">Placement</span>
+        <div class="seg">
+          <button data-calmode="split" aria-pressed="${c.mode==='split'}">Fill gaps</button>
+          <button data-calmode="block" aria-pressed="${c.mode==='block'}">One continuous block</button>
+        </div>
+        <span class="muted" style="font-size:12.5px">${c.mode==='split'? 'takes any free days in order — may pause for other work' : 'waits for one window big enough for the whole effort'}</span>
+      </div>
+      ${best? `<div class="banner ok" style="margin-top:16px">
+        Fastest fit: <b>${best.m.name}</b> — finishes ${fmt(D(best.p.finish))}${best.p.segs.length>1? `, spread across ${best.p.segs.length} periods with breaks for other work` : ', one continuous run'}.
+      </div>` : `<div class="banner warn" style="margin-top:16px">No one has ${c.effort} free ${c.mode==='block'?'days in a single window':'days'} within the next ~14 months.</div>`}
+      <div class="row-key">
+        <span><i style="background:var(--line-2)"></i>Confirmed work</span>
+        <span><i class="dashed"></i>Potential — ${esc(c.name)}</span>
+        <span><i style="background:transparent;border:1px dotted var(--pot-b)"></i>Break between periods</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-h"><h2>${dc.roles} — calendar with overlay</h2><span class="hint">top lane = confirmed · bottom lane = potential</span></div>
+    <div class="card-b tl" style="--lab:168px">
+      ${tlHead(dc.role)}
+      ${people.map(m=>{
+        const bl = blocksOf(m.id), p = plans[m.id];
+        return `<div class="tl-row" style="min-height:64px">
+          <div class="tl-lab">
+            <div>${m.name}</div>
+            <small>${p? (p.segs.length>1? `${p.segs.length} periods · finish ${fmt(D(p.finish))}` : `finish ${fmt(D(p.finish))}`) : 'not enough free time'}</small>
+            <button class="mini-assign" data-assign-cal="${m.id}" ${p?'':'disabled'}>Assign here</button>
+          </div>
+          <div class="track" style="min-height:64px">${grid()}
+            ${bl.map(x=>bar(x.s,x.e,{bg:m.color, cls:'dim sm', top:6, text:`${esc(proj(x.p).name)} · ${x.days}d`})).join('')}
+            ${p? potBars(p) : `<div class="bar ghost sm" style="left:0;top:30px">no fit</div>`}
+          </div></div>`;
+      }).join('')}
+    </div>
+  </section>`;
+}
+
+/* ======================================================================
+   VIEW 5 · FINANCE
+   ====================================================================== */
+function viewFinance(){
+  const on = activePotentials();
+  const Sx = on.length ? buildScenario() : S;
+
+  const real = PROJECTS.filter(p=>p.status==='confirmed');
+  const totRevenue = real.reduce((n,p)=>n+(p.revenue||0),0);
+  const totCost = real.reduce((n,p)=>n+projectFinance(p.id, S).cost,0);
+  const totMargin = totRevenue-totCost;
+  const totOutsource = Z.filter(z=>z.outsource).reduce((n,z)=>n+z.outsource.cost,0);
+  const overBudget = real.map(p=>projectFinance(p.id,S)).filter(f=>!f.ok);
+
+  const r = range(), inRange = workdays(new Date(Math.max(TODAY,r.start)), r.end);
+  const capReal = TEAM.length*inRange;
+  const busyReal = TEAM.reduce((n,m)=>n+[...S.occ[m.id].keys()].filter(k=>D(k)>=r.start&&D(k)<=r.end).length,0);
+  const busyScn  = TEAM.reduce((n,m)=>n+[...Sx.occ[m.id].keys()].filter(k=>D(k)>=r.start&&D(k)<=r.end).length,0);
+
+  return `
+  <div class="head"><h1>Finance</h1></div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">Contracted revenue</div><div class="v">${money(totRevenue)}</div><div class="f">${real.length} confirmed projects</div></div>
+    <div class="kpi"><div class="l">Cost to finish everything</div><div class="v">${money(totCost)}</div><div class="f">${money(totOutsource)} of it outsourced</div></div>
+    <div class="kpi ${totMargin<0?'warn':''}"><div class="l">Projected margin</div><div class="v">${money(totMargin)}</div><div class="f">across all confirmed work</div></div>
+    <div class="kpi ${overBudget.length?'warn':''}"><div class="l">Over budget</div><div class="v">${overBudget.length}</div>
+      <div class="f">${overBudget.length? overBudget.map(f=>{const pj=real.find(p=>projectFinance(p.id,S)===f); return pj?pj.name:'';}).filter(Boolean).join(', ') : 'none'}</div></div>
+    <div class="kpi"><div class="l">Studio utilisation</div><div class="v">${Math.round(busyReal/capReal*100)}%</div>
+      <div class="f">${on.length? `${Math.round(busyScn/capReal*100)}% with potential projects on` : `next ${r.weeks} weeks`}</div></div>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <div class="card-h"><h2>Cost vs revenue by project</h2><span class="hint">green = covered · orange = short</span></div>
+      <div class="card-b">
+        ${real.map(p=>{
+          const f=projectFinance(p.id,S), pct=f.revenue? Math.min(100,Math.round(f.cost/f.revenue*100)):0;
+          return `<div style="margin-bottom:18px">
+            <div style="display:flex;justify-content:space-between;font-size:15px;margin-bottom:6px">
+              <span>${esc(p.name)}</span><span class="money">${money(f.cost)} / ${money(f.revenue)}</span></div>
+            <div style="height:10px;border-radius:6px;background:var(--line-2);overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:${f.ok?'var(--appr)':'var(--pause)'}"></div></div>
+            <div class="muted" style="font-size:12px;margin-top:5px">margin ${money(f.margin)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Team rates</h2><span class="hint">monthly in-house salary, USD</span></div>
+      <div class="card-b">
+        ${TEAM.map(m=>`<div class="ratebox"><span>${m.name} <span class="muted" style="font-size:12.5px">· ${DISC[m.team].role}</span></span>
+          <input type="number" min="0" step="50" value="${m.rate}" data-rate="${m.id}"></div>`).join('')}
+        <div class="muted" style="font-size:12px;margin-top:10px">Daily cost = monthly salary ÷ working days in that calendar month.</div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <div class="card-h"><h2>Potential projects — scenario switches</h2><span class="hint">turn on to see the effect on capacity and margin before committing</span></div>
+    <div class="card-b">
+      ${state.potentials.map(pp=>{
+        const sc = scenarios(pp.effort, pp.team)[0];
+        const cost = sc? Object.entries(sc.r.by).reduce((n,[id,days])=>{
+          let c=0; days.forEach(d=>c+=dailyRate(id, ym(d))); return n+c;
+        },0) : 0;
+        return `<div class="toggle">
+          <button class="switch" role="switch" aria-pressed="${pp.on}" data-pot-toggle="${pp.id}"><i></i></button>
+          <div style="flex:1"><div class="nm">${esc(pp.name)}</div>
+            <div class="sub">${pp.effort} ${DISC[pp.team].role.toLowerCase()}-days · ${DISC[pp.team].roles} · revenue ${money(pp.revenue)}</div></div>
+          <div style="text-align:right">
+            <div>${sc? fmt(D(sc.r.start))+' → '+fmt(D(sc.r.finish)) : 'no fit'}</div>
+            <div class="muted" style="font-size:12px">cost ≈ ${money(cost)} · margin ≈ ${money(pp.revenue-cost)}</div>
+          </div>
+        </div>`;
+      }).join('')}
+      ${on.length? `<div class="banner ${busyScn/capReal>1?'warn':'ok'}" style="margin-top:16px">
+        With ${on.map(p=>p.name).join(' + ')} switched on: utilisation goes from ${Math.round(busyReal/capReal*100)}% to
+        ${Math.round(busyScn/capReal*100)}%${busyScn>capReal? `, ${busyScn-capReal} days over team capacity — outsourcing or a hire will be needed` : ', still inside team capacity'}.
+      </div>` : `<div class="note" style="margin-top:16px">All switches off — figures above show only confirmed work.</div>`}
+    </div>
+  </section>`;
+}
+
+/* ======================================================================
+   VIEW 6 · ALL PROJECTS — калькулятор (як у вихідному Excel), повністю редагований
+   ====================================================================== */
+function lineRows(c, key, label){
+  const items = c[key];
+  return `<div class="calc-sec"><div class="calc-sec-h">${label}<span class="muted">${items.reduce((n,x)=>n+x.eff,0)}d</span></div>
+    ${items.map((x,i)=>`<div class="calc-row2">
+      <input value="${esc(x.name)}" data-calc="${c.id}" data-f="${key}" data-i="${i}" data-p="name">
+      <input type="number" min="0" value="${x.eff}" data-calc="${c.id}" data-f="${key}" data-i="${i}" data-p="eff">
+      <div class="num">${x.eff}d</div>
+      <button class="rm" data-calc-rm="${c.id}" data-rf="${key}" data-i="${i}" aria-label="Remove">×</button>
+    </div>`).join('') || '<div class="muted" style="font-size:12.5px;margin-bottom:6px">No line items.</div>'}
+    <button class="add" data-calc-add="${c.id}" data-af="${key}">+ add line</button>
+  </div>`;
+}
+function calcCard(c){
+  const t = calcTotals(c);
+  return `<section class="card" style="margin-bottom:16px">
+    <div class="card-h">
+      <input class="calc-title" value="${esc(c.name)}" data-calc="${c.id}" data-f="name" aria-label="Project name">
+      <span class="hint">Design ${t.designTotal}d · Arch ${t.archTotal}d</span>
+    </div>
+    <div class="card-b">
+      <div class="calc-sec">
+        <div class="calc-sec-h">3D — Interior<span class="muted">${t.designInt}d</span></div>
+        <div class="calc-row head"><div>Floor</div><div>Rooms</div><div>Effort/room</div><div>Total</div><div></div></div>
+        ${c.floors.map((f,i)=>`<div class="calc-row">
+          <input value="${esc(f.name)}" data-calc="${c.id}" data-f="floors" data-i="${i}" data-p="name">
+          <input type="number" min="0" value="${f.rooms}" data-calc="${c.id}" data-f="floors" data-i="${i}" data-p="rooms">
+          <input type="number" min="0" value="${f.eff}" data-calc="${c.id}" data-f="floors" data-i="${i}" data-p="eff">
+          <div class="num">${f.rooms*f.eff}d</div>
+          <button class="rm" data-calc-rm="${c.id}" data-rf="floors" data-i="${i}" aria-label="Remove floor">×</button>
+        </div>`).join('')}
+        <button class="add" data-calc-add="${c.id}" data-af="floors">+ add floor</button>
+      </div>
+
+      <div class="calc-sec">
+        <div class="calc-sec-h">3D — Exterior${c.ext?`<span class="muted">${t.designExt}d</span>`:''}</div>
+        ${c.ext? `
+          <div class="calc-row" style="grid-template-columns:1.4fr .8fr .9fr .7fr 26px">
+            <div class="muted" style="font-size:13px">Zones</div>
+            <input type="number" min="0" value="${c.ext.zones}" data-calc="${c.id}" data-f="ext" data-p="zones">
+            <input type="number" min="0" value="${c.ext.eff}" data-calc="${c.id}" data-f="ext" data-p="eff">
+            <div class="num">${t.designExt}d</div>
+            <button class="rm" data-calc-rmext="${c.id}" aria-label="Remove exterior scope">×</button>
+          </div>
+          <div class="calc-out">
+            <button data-calc-out="${c.id}" data-v="off" aria-pressed="${!c.outsourceExt}">In-house · ${money(t.designExt*c.designRate)}</button>
+            <button data-calc-out="${c.id}" data-v="on" aria-pressed="${!!c.outsourceExt}">Outsourced</button>
+          </div>
+          ${c.outsourceExt? `<div class="calc-row2" style="grid-template-columns:1.4fr .9fr .7fr 26px">
+            <div class="muted" style="font-size:13px">Flat fee, USD</div>
+            <input type="number" min="0" value="${c.outsourceExt.cost}" data-calc="${c.id}" data-f="outsourceExt" data-p="cost">
+            <div class="num">flat</div><div></div></div>`:''}
+        ` : `<button class="add" data-calc-addext="${c.id}">+ add exterior scope</button>`}
+      </div>
+
+      ${lineRows(c,'dwgInt','Drawings — Interior')}
+      ${lineRows(c,'dwgExt','Drawings — Exterior')}
+
+      <div class="calc-sec">
+        <div class="calc-sec-h">Finance calculator</div>
+        <div class="ratebox"><span>Contract budget, USD</span><input type="number" min="0" step="100" value="${c.budget}" data-calc="${c.id}" data-f="budget"></div>
+        <div class="ratebox"><span>Designer rate, USD/day</span><input type="number" min="0" step="5" value="${c.designRate}" data-calc="${c.id}" data-f="designRate"></div>
+        <div class="ratebox"><span>Architect rate, USD/day</span><input type="number" min="0" step="5" value="${c.archRate}" data-calc="${c.id}" data-f="archRate"></div>
+        <div class="ratebox"><span>PM / overhead, USD</span><input type="number" min="0" step="50" value="${c.pmFee}" data-calc="${c.id}" data-f="pmFee"></div>
+
+        <div style="margin-top:16px">
+          <div class="calc-fin-row" style="color:var(--muted);font-size:11.5px"><div>Expense line</div><div class="num">Days</div><div class="num">Rate</div><div class="num">Cost</div></div>
+          <div class="calc-fin-row"><div>Interior 3D</div><div class="num">${t.designInt}</div><div class="num">${money(c.designRate)}</div><div class="num">${money(t.designInt*c.designRate)}</div></div>
+          ${c.ext? `<div class="calc-fin-row"><div>Exterior 3D${c.outsourceExt?' · outsourced':''}</div><div class="num">${t.designExt}</div><div class="num">${c.outsourceExt?'flat':money(c.designRate)}</div><div class="num">${money(t.extCost)}</div></div>`:''}
+          <div class="calc-fin-row"><div>Drawings</div><div class="num">${t.archTotal}</div><div class="num">${money(c.archRate)}</div><div class="num">${money(t.archTotal*c.archRate)}</div></div>
+          <div class="calc-fin-row"><div>PM / overhead</div><div class="num">—</div><div class="num">—</div><div class="num">${money(c.pmFee)}</div></div>
+          <div class="calc-fin-row" style="font-weight:600"><div>Total expenses</div><div></div><div></div><div class="num">${money(t.expenses)}</div></div>
+        </div>
+        <div class="banner ${t.income>=0?'ok':'warn'}" style="margin-top:14px">
+          Budget ${money(c.budget)} − expenses ${money(t.expenses)} = planned income <b>${money(t.income)}</b>${t.income<0?' — over budget':''}
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+function viewAllProjects(){
+  const rows = CALC.map(c=>({c, t:calcTotals(c)}));
+  const total = rows.reduce((a,r)=>({budget:a.budget+r.c.budget, expenses:a.expenses+r.t.expenses, income:a.income+r.t.income,
+    d:a.d+r.t.designTotal, ar:a.ar+r.t.archTotal}), {budget:0,expenses:0,income:0,d:0,ar:0});
+  const buf = state.calcBuffer;
+  const gc = '1.3fr repeat(5,1fr)';
+
+  return `
+  <div class="head"><div><h1>All projects</h1><div class="sub" style="margin-top:4px">production plan + finance calculator · edit anything below</div></div>
+    <div class="spacer"></div><button class="btn" data-calc-newproj>+ New project</button></div>
+
+  ${rows.map(r=>calcCard(r.c)).join('')}
+
+  <section class="card">
+    <div class="card-h"><h2>Finance planning — all projects</h2><span class="hint">designer / architect working days required across the studio</span></div>
+    <div class="card-b">
+      <div class="master-row head" style="grid-template-columns:${gc}"><div>Project</div><div class="num">Budget</div><div class="num">Expenses</div><div class="num">Income</div><div class="num">Designer WD</div><div class="num">Architect WD</div></div>
+      ${rows.map(r=>`<div class="master-row" style="grid-template-columns:${gc}">
+        <div>${esc(r.c.name)}</div><div class="num">${money(r.c.budget)}</div><div class="num">${money(r.t.expenses)}</div>
+        <div class="num" style="color:${r.t.income>=0?'inherit':'var(--warn-t)'}">${money(r.t.income)}</div>
+        <div class="num">${r.t.designTotal}</div><div class="num">${r.t.archTotal}</div></div>`).join('')}
+      <div class="master-row total" style="grid-template-columns:${gc}">
+        <div>Total</div><div class="num">${money(total.budget)}</div><div class="num">${money(total.expenses)}</div>
+        <div class="num" style="color:${total.income>=0?'inherit':'var(--warn-t)'}">${money(total.income)}</div>
+        <div class="num">${total.d}</div><div class="num">${total.ar}</div></div>
+      <div class="master-row derived" style="grid-template-columns:${gc}">
+        <div>If 2 people in parallel</div><div></div><div></div><div></div>
+        <div class="num">${Math.round(total.d/2)}</div><div class="num">${Math.round(total.ar/2)}</div></div>
+      <div class="master-row derived" style="grid-template-columns:${gc}">
+        <div>Calendar days <span style="font-size:11px">(×<input class="buf-input" type="number" step="0.1" min="1" value="${buf}" data-calcbuf>)</span></div>
+        <div></div><div></div><div></div>
+        <div class="num">${Math.round(total.d*buf)}</div><div class="num">${Math.round(total.ar*buf)}</div></div>
+      <div class="master-row derived" style="grid-template-columns:${gc}">
+        <div>Calendar days if 2 in parallel</div><div></div><div></div><div></div>
+        <div class="num">${Math.round(total.d*buf/2)}</div><div class="num">${Math.round(total.ar*buf/2)}</div></div>
+      <div class="muted" style="font-size:12px;margin-top:14px">Calendar-days buffer accounts for approvals, pauses and non-parallel handoffs — adjust it to match how your studio actually runs.</div>
+    </div>
+  </section>`;
+}
+
+/* ======================================================================
+   ПАНЕЛЬ ЗОНИ
+   ====================================================================== */
+function openZone(id){
+  const z = Z.find(x=>x.id===id); if(!z) return;
+  state.selZone=id;
+  const s = S.byId.get(id), dc=DISC[z.d];
+  drawer(`<button class="x" data-close aria-label="Close">×</button>
+    <div class="muted" style="font-size:13px">${esc(proj(z.p).name)} · ${dc.name} · ${esc(z.floor)}</div>
+    <h3>${esc(z.name)}</h3>
+
+    <div class="field"><div class="fl">Status</div>
+      <div class="stbtns">${Object.entries(STATUS).map(([k,v])=>`<button data-set-status="${k}" aria-pressed="${z.status===k}"
+        style="${z.status===k?`background:${v.col};color:${v.ink}`:''}">${v.lab}</button>`).join('')}</div></div>
+
+    ${z.status==='paused'?`<div class="field"><div class="fl">Reason</div>
+      <select data-reason>${REASONS.map(r=>`<option ${z.reason===r?'selected':''}>${r}</option>`).join('')}</select>
+      <div class="muted" style="font-size:12.5px;margin-top:7px">Paused ${dc.unit1} releases the ${dc.role.toLowerCase()} — the calendar gives those days to other work.</div></div>`:''}
+
+    <div class="field"><div class="fl">First version effort</div>
+      <div class="stepper"><button data-eff="-1">−</button><span>${z.effort} d</span><button data-eff="1">+</button></div></div>
+
+    ${z.status==='revision'?`<div class="field"><div class="fl">Revision effort</div>
+      <div class="stepper"><button data-rev="-1">−</button><span>${z.revEffort} d</span><button data-rev="1">+</button></div></div>`:''}
+
+    <div class="field"><div class="fl">${dc.role}</div>
+      <select data-assign><option value="">Not assigned</option>
+      ${TEAM.filter(m=>m.team===z.d).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${m.name}</option>`).join('')}</select></div>
+
+    <div class="field"><div class="fl">Delivery</div>
+      <div class="stbtns">
+        <button data-outsource="off" aria-pressed="${!z.outsource}">In-house</button>
+        <button data-outsource="on"  aria-pressed="${!!z.outsource}" ${!z.a?'disabled':''}>Outsourced</button>
+      </div>
+      ${z.outsource? `<div style="margin-top:10px"><div class="fl">Flat fee, USD</div>
+        <input type="number" min="0" step="50" value="${z.outsource.cost}" data-outfee="${z.id}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
+      </div>` : z.a? `<div class="muted" style="font-size:12.5px;margin-top:8px">
+        In-house ≈ ${money(zoneCostEstimate({...z,outsource:null,status:'pending'}))} at ${person(z.a).name}'s current rate.</div>` : ''}
+    </div>
+
+    <div class="note">${
+      z.status==='approved' ? '<b>Approved.</b> No more work in the calendar.' :
+      z.status==='paused'   ? `<b>On hold.</b> ${z.effort} days wait outside the calendar.` :
+      s && s.s ? `<b>${active(z)} days in the calendar</b> · ${fmt(D(s.s))} – ${fmt(D(s.e))}${s.days.length<workdays(D(s.s),D(s.e))?` · with breaks for other work`:''}` :
+      z.a ? '<b>Waiting.</b> Starts after the previous stage is approved.' : '<b>No one assigned.</b> Pick a person above.'
+    }${z.after?`<br>Starts ${z.after.lag} days after ${esc(z.after.floor)} 3D is finished.`:''}</div>
+
+    <button class="btn ghost" data-del style="margin-top:20px;width:100%">Remove ${dc.unit1}</button>`);
+}
+function drawer(h){ const d=document.getElementById('drawer'); d.innerHTML=h; d.dataset.open='true'; document.getElementById('scrim').dataset.open='true'; }
+function closeDrawer(){ state.selZone=null; document.getElementById('drawer').dataset.open='false'; document.getElementById('scrim').dataset.open='false'; render(); }
+let TT; function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.dataset.show='true'; clearTimeout(TT); TT=setTimeout(()=>t.dataset.show='false',2600); }
+
+/* ======================================================================
+   РЕНДЕР
+   ====================================================================== */
+function render(){
+  const r=range();
+  document.getElementById('range').innerHTML =
+    `<button data-shift="-1" aria-label="Previous week">‹</button>${fmt(r.start)} — ${fmt(r.end)}<button data-shift="1" aria-label="Next week">›</button>`;
+  document.getElementById('tabs').innerHTML = [['production','Project production'],['load','Studio load'],['potential','Potential project'],['calendar','Resource calendar'],['finance','Finance'],['all','All projects']]
+    .map(([k,l])=>`<button role="tab" data-tab="${k}" aria-selected="${state.tab===k}">${l}</button>`).join('');
+  document.getElementById('main').innerHTML =
+    state.tab==='load' ? viewLoad() : state.tab==='potential' ? viewPotential() : state.tab==='calendar' ? viewCalendar()
+    : state.tab==='finance' ? viewFinance() : state.tab==='all' ? viewAllProjects() : viewProduction();
+}
+
+/* ======================================================================
+   ПОДІЇ
+   ====================================================================== */
+function curZone(){ return Z.find(x=>x.id===state.selZone) }
+function changed(msg){ dbSaveZone(curZone()); S=build(); render(); if(state.selZone) openZone(state.selZone); if(msg) toast(msg); }
+
+document.addEventListener('click', e=>{
+  const el=s=>e.target.closest(s); let n;
+  if(el('[data-close]') || e.target.id==='scrim'){ closeDrawer(); return; }
+  if(n=el('[data-tab]')){ state.tab=n.dataset.tab; render(); return; }
+  if(n=el('[data-shift]')){ state.offset+= +n.dataset.shift; render(); return; }
+  if(n=el('[data-disc]')){
+    state.disc=n.dataset.disc;
+    if(!Z.some(z=>z.p===state.project&&z.d===state.disc)){ const p=Z.find(z=>z.d===state.disc); if(p) state.project=p.p; }
+    render(); return;
+  }
+  if(n=el('[data-goto]')){ const [p,d]=n.dataset.goto.split('|'); state.project=p; state.disc=d; state.tab='production'; render(); window.scrollTo({top:0}); return; }
+  if(n=el('[data-zone]')){ openZone(n.dataset.zone); render(); openZone(n.dataset.zone); return; }
+  if(n=el('[data-add]')){
+    const f=n.dataset.add, same=Z.filter(z=>z.p===state.project&&z.d===state.disc&&z.floor===f);
+    const tmpl=same[same.length-1]||{effort:2,a:null};
+    const num=Math.max(0,...same.map(z=>z.n))+1;
+    zone({p:state.project, d:state.disc, floor:f, n:num, name:state.disc==='viz'?'Room '+String(num).padStart(2,'0'):'Package '+num,
+      effort:tmpl.effort, status:'pending', a:tmpl.a});
+    dbSaveZone(Z[Z.length-1]);
+    S=build(); render(); toast(`${f}: ${DISC[state.disc].unit1} ${num} added · ${tmpl.effort}d`); return;
+  }
+  const z = curZone();
+  if(z && (n=el('[data-set-status]'))){ z.status=n.dataset.setStatus; if(z.status==='paused'&&!z.reason) z.reason=REASONS[0]; changed(`${z.name}: ${STATUS[z.status].lab}`); return; }
+  if(z && (n=el('[data-eff]'))){ z.effort=Math.max(1,z.effort+ +n.dataset.eff); changed(`${z.name}: ${z.effort} days`); return; }
+  if(z && (n=el('[data-rev]'))){ z.revEffort=Math.max(1,z.revEffort+ +n.dataset.rev); changed(`${z.name}: revision ${z.revEffort} days`); return; }
+  if(z && (n=el('[data-outsource]'))){
+    if(n.dataset.outsource==='on'){ if(!z.a){ toast('Assign a person first'); return; } z.outsource={cost: Math.round(z.effort*nominalRate(z.a))}; }
+    else { z.outsource=null; }
+    changed(`${z.name}: ${z.outsource? 'outsourced · '+money(z.outsource.cost) : 'back in-house'}`);
+    return;
+  }
+  if(z && el('[data-del]')){ dbDeleteZone(z.id); Z=Z.filter(x=>x.id!==z.id); state.selZone=null; closeDrawer(); S=build(); render(); toast(`${z.name} removed`); return; }
+
+  if(el('[data-simulate]')){
+    state.sim.name=document.getElementById('simName').value.trim()||'New project';
+    state.sim.effort=Math.max(1,+document.getElementById('simEff').value||1);
+    state.sim.team=document.getElementById('simTeam').value;
+    state.sim.ran=true; state.sim.pick=0; render(); return;
+  }
+  if(n=el('[data-pick]')){ state.sim.pick=+n.dataset.pick; render(); return; }
+  if(el('[data-calrun]')){
+    state.cal.name=document.getElementById('calName').value.trim()||'New project';
+    state.cal.effort=Math.max(1,+document.getElementById('calEff').value||1);
+    state.cal.team=document.getElementById('calTeam').value;
+    render(); return;
+  }
+  if(n=el('[data-calmode]')){ state.cal.mode=n.dataset.calmode; render(); return; }
+  if(n=el('[data-pot-toggle]')){
+    const pp=state.potentials.find(x=>x.id===n.dataset.potToggle); if(!pp) return;
+    pp.on=!pp.on; dbSavePotential(pp); render(); return;
+  }
+  if(n=el('[data-assign-cal]')){
+    const id=n.dataset.assignCal, c=state.cal;
+    const p = c.mode==='block'? continuousPlan(id,c.effort) : splitPlan(id,c.effort);
+    if(!p){ toast('Not enough free capacity for this person'); return; }
+    const pid=c.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+Date.now()%1000;
+    PROJECTS.push({id:pid, name:c.name, prio:9, status:'confirmed'});
+    dbSaveProject(PROJECTS[PROJECTS.length-1]);
+    p.segs.forEach((sg,i)=>zone({p:pid, d:c.team, floor:p.segs.length>1?`Period ${i+1}`:'Assignment', n:1,
+      name:`${person(id).name} · ${workdays(D(sg.s),D(sg.e))}d`, effort:workdays(D(sg.s),D(sg.e)), status:'pending', a:id, earliest:sg.s}));
+    Z.slice(-p.segs.length).forEach(dbSaveZone);
+    S=build(); state.project=pid; state.disc=c.team; state.tab='production'; render(); window.scrollTo({top:0});
+    toast(`${c.name} → ${person(id).name} · finish ${fmt(D(p.finish))}`);
+    return;
+  }
+  if(n=el('[data-calc-add]')){
+    const c=CALC.find(x=>x.id===n.dataset.calcAdd); const f=n.dataset.af;
+    if(f==='floors') c.floors.push({name:'New floor', rooms:1, eff:2});
+    else c[f].push({name:'New line', eff:2});
+    render(); return;
+  }
+  if(n=el('[data-calc-rm]')){
+    const c=CALC.find(x=>x.id===n.dataset.calcRm); c[n.dataset.rf].splice(+n.dataset.i,1); render(); return;
+  }
+  if(n=el('[data-calc-addext]')){
+    const c=CALC.find(x=>x.id===n.dataset.calcAddext); c.ext={zones:1, eff:7}; render(); return;
+  }
+  if(n=el('[data-calc-rmext]')){
+    const c=CALC.find(x=>x.id===n.dataset.calcRmext); c.ext=null; c.outsourceExt=null; render(); return;
+  }
+  if(n=el('[data-calc-out]')){
+    const c=CALC.find(x=>x.id===n.dataset.calcOut);
+    if(n.dataset.v==='on'){ const base=(c.ext?c.ext.zones*c.ext.eff:0)*c.designRate; c.outsourceExt={cost:Math.round(base*1.2)||1000}; }
+    else c.outsourceExt=null;
+    render(); return;
+  }
+  if(el('[data-calc-newproj]')){
+    const id='c'+Date.now()%100000;
+    CALC.push({id, name:'New project', budget:0, pmFee:0, designRate:115, archRate:90,
+      floors:[{name:'Ground Floor', rooms:1, eff:2}], ext:null, outsourceExt:null, dwgInt:[{name:'Drawings', eff:5}], dwgExt:[]});
+    render(); return;
+  }
+  if(el('[data-confirm]')){
+    const sm=state.sim, o=scenarios(+sm.effort, sm.team)[sm.pick]; if(!o) return;
+    const id=sm.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+Date.now()%1000;
+    PROJECTS.push({id, name:sm.name, prio:9, status:'confirmed'});
+    dbSaveProject(PROJECTS[PROJECTS.length-1]);
+    const before=Z.length;
+    Object.entries(o.r.by).forEach(([pid,days],i)=>zone({p:id, d:sm.team, floor:'Block '+(i+1), n:1,
+      name:`${person(pid).name} block`, effort:days.length, status:'pending', a:pid, earliest:days[0]}));
+    Z.slice(before).forEach(dbSaveZone);
+    S=build(); state.project=id; state.disc=sm.team; state.tab='production'; state.sim.ran=false; render(); window.scrollTo({top:0});
+    toast(`${sm.name} is in production · finish ${fmt(D(o.r.finish))}`); return;
+  }
+});
+document.addEventListener('change', e=>{
+  const t=e.target, z=curZone();
+  if(t.id==='projSel'){ state.project=t.value; render(); return; }
+  if(z && t.dataset.assign!==undefined){ z.a=t.value||null; if(!z.a) z.outsource=null; changed(`${z.name}: ${z.a?person(z.a).name:'not assigned'}`); return; }
+  if(z && t.dataset.reason!==undefined){ z.reason=t.value; changed(`${z.name}: ${z.reason}`); return; }
+  if(z && t.dataset.outfee!==undefined){ z.outsource.cost=Math.max(0,+t.value||0); changed(`${z.name}: outsourced · ${money(z.outsource.cost)}`); return; }
+  if(t.dataset.rate!==undefined){ const m=person(t.dataset.rate); m.rate=Math.max(0,+t.value||0); dbSaveRate(m); S=build(); render(); toast(`${m.name}: ${money(m.rate)}/month`); return; }
+  if(t.dataset.calcbuf!==undefined){ state.calcBuffer=Math.max(1,+t.value||1); render(); return; }
+  if(t.dataset.calc!==undefined){
+    const c=CALC.find(x=>x.id===t.dataset.calc); if(!c) return;
+    const f=t.dataset.f, i=t.dataset.i, p=t.dataset.p;
+    if(f==='name'){ c.name=t.value; render(); return; }
+    if(['budget','designRate','archRate','pmFee'].includes(f)){ c[f]=Math.max(0,+t.value||0); render(); return; }
+    if(f==='ext'){ c.ext[p]=Math.max(0,+t.value||0); render(); return; }
+    if(f==='outsourceExt'){ c.outsourceExt.cost=Math.max(0,+t.value||0); render(); return; }
+    if(f==='floors'||f==='dwgInt'||f==='dwgExt'){ c[f][i][p] = p==='name'? t.value : Math.max(0,+t.value||0); render(); return; }
+  }
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
+
+/* ---------- завантаження зі спільної бази; якщо недоступна — лишається демо-набір вище ---------- */
+async function boot(){
+  S = build(); render();               // демо-дані одразу, щоб екран не був порожнім
+  if(!sb) return;
+  try{
+    const [team, proj, zones, pot] = await Promise.all([
+      sb.from('studio_team').select('*'),
+      sb.from('studio_projects').select('*'),
+      sb.from('studio_zones').select('*'),
+      sb.from('studio_potentials').select('*'),
+    ]);
+    if(team.error||proj.error||zones.error||pot.error) throw (team.error||proj.error||zones.error||pot.error);
+    TEAM.length=0; TEAM.push(...team.data.map(r=>({id:r.id,name:r.name,team:r.team,color:r.color,rate:Number(r.rate)})));
+    PROJECTS.length=0; PROJECTS.push(...proj.data.map(r=>({id:r.id,name:r.name,prio:r.prio,status:r.status,revenue:Number(r.revenue)})));
+    Z.length=0; Z.push(...zones.data.map(fromDbZone));
+    state.potentials.length=0; state.potentials.push(...pot.data.map(r=>({id:r.id,name:r.name,effort:Number(r.effort),team:r.team,revenue:Number(r.revenue),on:r.is_on})));
+    seq = Z.reduce((n,z)=>{ const m=/^z(\d+)$/.exec(z.id); return m? Math.max(n,+m[1]) : n; }, 0);
+    S = build(); render();
+    toast('Loaded from Production Plan (Supabase)');
+  }catch(e){
+    console.error('Supabase load failed, staying on local demo data', e);
+    toast('Could not reach the database — showing local demo data');
+  }
+}
+boot();
+</script>
+</body>
+</html>
