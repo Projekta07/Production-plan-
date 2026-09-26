@@ -374,6 +374,11 @@ zone({p:'tanger1', d:'wd', floor:'Ground',  n:1, name:'Ground set',  effort:7, s
 zone({p:'tanger1', d:'wd', floor:'First',   n:1, name:'First set',   effort:7, status:'pending', a:'KT', after:dep('tanger1','First')});
 zone({p:'tanger1', d:'wd', floor:'AD',      n:1, name:'Arch. details',effort:3, status:'pending', a:'KT'});
 zone({p:'tanger1', d:'wd', floor:'LS',      n:1, name:'Landscape',   effort:3, status:'pending', a:'KT'});
+// Majed · вже зроблено: екстер'єр (Іра, аутсорс) + фасадні й ландшафтні креслення (Марія, Юля)
+zone({p:'majed', d:'viz', floor:'Exterior', n:1, name:'Exterior', effort:7, status:'approved', a:'IR'});
+zone({p:'majed', d:'wd', floor:'Facade',    n:1, name:'Facade drawings',    effort:7, status:'approved', a:'KT'});
+zone({p:'majed', d:'wd', floor:'Landscape', n:1, name:'Landscape drawings', effort:7, status:'approved', a:'AN'});
+
 // будь-яка зона фрилансера без вказаної ціни отримує явний $0 до заповнення (замість тихого безкоштовного in-house)
 Z.filter(z=>z.a && TEAM.find(m=>m.id===z.a && m.type==='freelance') && !z.outsource).forEach(z=>z.outsource={cost:0});
 
@@ -383,21 +388,29 @@ Z.filter(z=>z.a && TEAM.find(m=>m.id===z.a && m.type==='freelance') && !z.outsou
    Незалежний від Z/Sx — це проектно-кошторисний рівень, а не операційний.
    ====================================================================== */
 let CALC = [
-  {id:'c1', name:'Tanger 1', budget:18800, pmFee:700, designRate:115, archRate:90, archExecutor:null, committedProjectId:null,
+  {id:'c1', name:'Tanger 1', budget:18800, pmFee:700, designRate:115, archRate:90, currency:'USD', archExecutor:null, committedProjectId:null,
     floors:[{name:'Floor - Sol', rooms:6, eff:2, executor:null}, {name:'RDC', rooms:5, eff:2, executor:null}, {name:'Floor - Etage', rooms:9, eff:2, executor:null}],
     ext:{zones:1, eff:7, executor:null}, outsourceExt:null,
     dwgInt:[{name:'Floor -1', eff:8}, {name:'RDC', eff:8}, {name:'Floor 2', eff:8}],
     dwgExt:[{name:'AD', eff:5}, {name:'Landscape', eff:5}]},
-  {id:'c2', name:'D10 Palm', budget:30000, pmFee:1000, designRate:115, archRate:90, archExecutor:null, committedProjectId:null,
+  {id:'c2', name:'D10 Palm', budget:30000, pmFee:1000, designRate:115, archRate:90, currency:'USD', archExecutor:null, committedProjectId:null,
     floors:[{name:'Ground Floor', rooms:7, eff:2, executor:null}, {name:'1st Floor', rooms:7, eff:2, executor:null}],
     ext:{zones:1, eff:7, executor:null}, outsourceExt:null,
     dwgInt:[{name:'Ground floor', eff:10}, {name:'1st Floor', eff:10}],
     dwgExt:[{name:'AD', eff:5}, {name:'Landscape', eff:5}]},
-  {id:'c3', name:'Vida', budget:6380, pmFee:300, designRate:115, archRate:90, archExecutor:null, committedProjectId:null,
+  {id:'c3', name:'Vida', budget:6380, pmFee:300, designRate:115, archRate:90, currency:'USD', archExecutor:null, committedProjectId:null,
     floors:[{name:'Floor 30', rooms:8, eff:2, executor:null}],
     ext:null, outsourceExt:null,
     dwgInt:[{name:'WD', eff:20}],
     dwgExt:[]},
+  // Majed Palm villa (M109) — already in production; kept here as a planning reference, billed in AED
+  {id:'c-majed', name:'Majed — Palm villa M109', budget:136800, pmFee:0, designRate:370, archRate:330, currency:'AED',
+    archExecutor:'KT', committedProjectId:'majed',
+    floors:[{name:'Ground Floor', rooms:5, eff:1.5, executor:'EV'}, {name:'First Floor', rooms:12, eff:0.875, executor:'EV'}],
+    ext:{zones:1, eff:7, executor:'IR'}, outsourceExt:null,
+    dwgInt:[{name:'GF Plans',eff:14},{name:'GF Elevations',eff:14},{name:'GF Technical requirements',eff:14},
+            {name:'FF Plans',eff:14},{name:'FF Elevations',eff:14},{name:'FF Technical requirements',eff:14}],
+    dwgExt:[{name:'Facade (Maria)',eff:7},{name:'Landscape (Julia)',eff:7}]},
 ];
 function calcTotals(c){
   const designInt = c.floors.reduce((n,f)=>n+f.rooms*f.eff,0);
@@ -1281,16 +1294,18 @@ function execSelect(team, value, attrs){
 }
 function calcCard(c){
   const t = calcTotals(c);
+  const cur = c.currency || 'USD';
   const zonesTotal = c.floors.reduce((n,f)=>n+f.rooms,0) + (c.ext? c.ext.zones : 0) + c.dwgInt.length + c.dwgExt.length;
   return `<section class="card" style="margin-bottom:16px">
     <div class="card-h">
       <input class="calc-title" value="${esc(c.name)}" data-calc="${c.id}" data-f="name" aria-label="Project name">
-      <span class="hint">Design ${t.designTotal}d · Arch ${t.archTotal}d</span>
+      <span class="hint">Design ${t.designTotal}d · Arch ${t.archTotal}d${cur!=='USD'?' · billed in '+cur:''}</span>
       <div class="spacer"></div>
       ${c.committedProjectId
         ? `<span class="badge-done">✓ In production</span><button class="pill" data-goto="${c.committedProjectId}|viz">Open →</button>`
         : `<button class="btn" data-calc-commit="${c.id}">Create in Production</button>`}
     </div>
+    ${c.committedProjectId? `<div class="muted" style="font-size:11.5px;padding:0 24px 12px">Already committed — figures below are a planning reference; the real contract, currency and payment schedule live under Project Production → Finance.</div>`:''}
     <div class="card-b">
       <div class="calc-sec">
         <div class="calc-sec-h">3D — Interior<span class="muted">${t.designInt}d</span></div>
@@ -1318,11 +1333,11 @@ function calcCard(c){
             <button class="rm" data-calc-rmext="${c.id}" aria-label="Remove exterior scope">×</button>
           </div>
           <div class="calc-out">
-            <button data-calc-out="${c.id}" data-v="off" aria-pressed="${!c.outsourceExt}">In-house · ${money(t.designExt*c.designRate)}</button>
+            <button data-calc-out="${c.id}" data-v="off" aria-pressed="${!c.outsourceExt}">In-house · ${money(t.designExt*c.designRate,cur)}</button>
             <button data-calc-out="${c.id}" data-v="on" aria-pressed="${!!c.outsourceExt}">Outsourced</button>
           </div>
           ${c.outsourceExt? `<div class="calc-row2" style="grid-template-columns:1.4fr .9fr .7fr 26px">
-            <div class="muted" style="font-size:13px">Flat fee, USD</div>
+            <div class="muted" style="font-size:13px">Flat fee, ${cur}</div>
             <input type="number" min="0" value="${c.outsourceExt.cost}" data-calc="${c.id}" data-f="outsourceExt" data-p="cost">
             <div class="num">flat</div><div></div></div>`:''}
         ` : `<button class="add" data-calc-addext="${c.id}">+ add exterior scope</button>`}
@@ -1334,21 +1349,23 @@ function calcCard(c){
 
       <div class="calc-sec">
         <div class="calc-sec-h">Finance calculator</div>
-        <div class="ratebox"><span>Contract budget, USD</span><input type="number" min="0" step="100" value="${c.budget}" data-calc="${c.id}" data-f="budget"></div>
-        <div class="ratebox"><span>Designer rate, USD/day</span><input type="number" min="0" step="5" value="${c.designRate}" data-calc="${c.id}" data-f="designRate"></div>
-        <div class="ratebox"><span>Architect rate, USD/day</span><input type="number" min="0" step="5" value="${c.archRate}" data-calc="${c.id}" data-f="archRate"></div>
-        <div class="ratebox"><span>PM / overhead, USD</span><input type="number" min="0" step="50" value="${c.pmFee}" data-calc="${c.id}" data-f="pmFee"></div>
+        <div class="ratebox"><span>Currency</span><select data-calc="${c.id}" data-f="currency" style="width:110px;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px">
+          <option value="USD" ${cur==='USD'?'selected':''}>USD</option><option value="AED" ${cur==='AED'?'selected':''}>AED</option></select></div>
+        <div class="ratebox"><span>Contract budget, ${cur}</span><input type="number" min="0" step="100" value="${c.budget}" data-calc="${c.id}" data-f="budget"></div>
+        <div class="ratebox"><span>Designer rate, ${cur}/day</span><input type="number" min="0" step="5" value="${c.designRate}" data-calc="${c.id}" data-f="designRate"></div>
+        <div class="ratebox"><span>Architect rate, ${cur}/day</span><input type="number" min="0" step="5" value="${c.archRate}" data-calc="${c.id}" data-f="archRate"></div>
+        <div class="ratebox"><span>PM / overhead, ${cur}</span><input type="number" min="0" step="50" value="${c.pmFee}" data-calc="${c.id}" data-f="pmFee"></div>
 
         <div style="margin-top:16px">
           <div class="calc-fin-row" style="color:var(--muted);font-size:11.5px"><div>Expense line</div><div class="num">Days</div><div class="num">Rate</div><div class="num">Cost</div></div>
-          <div class="calc-fin-row"><div>Interior 3D</div><div class="num">${t.designInt}</div><div class="num">${money(c.designRate)}</div><div class="num">${money(t.designInt*c.designRate)}</div></div>
-          ${c.ext? `<div class="calc-fin-row"><div>Exterior 3D${c.outsourceExt?' · outsourced':''}</div><div class="num">${t.designExt}</div><div class="num">${c.outsourceExt?'flat':money(c.designRate)}</div><div class="num">${money(t.extCost)}</div></div>`:''}
-          <div class="calc-fin-row"><div>Drawings</div><div class="num">${t.archTotal}</div><div class="num">${money(c.archRate)}</div><div class="num">${money(t.archTotal*c.archRate)}</div></div>
-          <div class="calc-fin-row"><div>PM / overhead</div><div class="num">—</div><div class="num">—</div><div class="num">${money(c.pmFee)}</div></div>
-          <div class="calc-fin-row" style="font-weight:600"><div>Total expenses</div><div></div><div></div><div class="num">${money(t.expenses)}</div></div>
+          <div class="calc-fin-row"><div>Interior 3D</div><div class="num">${t.designInt}</div><div class="num">${money(c.designRate,cur)}</div><div class="num">${money(t.designInt*c.designRate,cur)}</div></div>
+          ${c.ext? `<div class="calc-fin-row"><div>Exterior 3D${c.outsourceExt?' · outsourced':''}</div><div class="num">${t.designExt}</div><div class="num">${c.outsourceExt?'flat':money(c.designRate,cur)}</div><div class="num">${money(t.extCost,cur)}</div></div>`:''}
+          <div class="calc-fin-row"><div>Drawings</div><div class="num">${t.archTotal}</div><div class="num">${money(c.archRate,cur)}</div><div class="num">${money(t.archTotal*c.archRate,cur)}</div></div>
+          <div class="calc-fin-row"><div>PM / overhead</div><div class="num">—</div><div class="num">—</div><div class="num">${money(c.pmFee,cur)}</div></div>
+          <div class="calc-fin-row" style="font-weight:600"><div>Total expenses</div><div></div><div></div><div class="num">${money(t.expenses,cur)}</div></div>
         </div>
         <div class="banner ${t.income>=0?'ok':'warn'}" style="margin-top:14px">
-          Budget ${money(c.budget)} − expenses ${money(t.expenses)} = planned income <b>${money(t.income)}</b>${t.income<0?' — over budget':''}
+          Budget ${money(c.budget,cur)} − expenses ${money(t.expenses,cur)} = planned income <b>${money(t.income,cur)}</b>${t.income<0?' — over budget':''}
         </div>
       </div>
     </div>
@@ -1362,7 +1379,7 @@ function uniqueProjectId(base){
 function commitCalcToProduction(c){
   const id = uniqueProjectId(c.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'project');
   const prio = Math.max(0,...PROJECTS.map(p=>p.prio))+1;
-  PROJECTS.push({id, name:c.name, prio, status:'confirmed', revenue:c.budget||0});
+  PROJECTS.push({id, name:c.name, prio, status:'confirmed', revenue:c.budget||0, currency:c.currency||'USD', payments:[]});
   dbSaveProject(PROJECTS[PROJECTS.length-1]);
 
   const before = Z.length;
@@ -1392,8 +1409,10 @@ function commitCalcToProduction(c){
 }
 
 function viewAllProjects(){
-  const rows = CALC.map(c=>({c, t:calcTotals(c)}));
-  const total = rows.reduce((a,r)=>({budget:a.budget+r.c.budget, expenses:a.expenses+r.t.expenses, income:a.income+r.t.income,
+  const rows = CALC.map(c=>({c, t:calcTotals(c), cur:c.currency||'USD'}));
+  const mixedCalcCurrency = rows.some(r=>r.cur!=='USD');
+  const total = rows.reduce((a,r)=>({
+    budget:a.budget+toUSD(r.c.budget,r.cur), expenses:a.expenses+toUSD(r.t.expenses,r.cur), income:a.income+toUSD(r.t.income,r.cur),
     d:a.d+r.t.designTotal, ar:a.ar+r.t.archTotal}), {budget:0,expenses:0,income:0,d:0,ar:0});
   const buf = state.calcBuffer;
   const gc = '1.3fr repeat(5,1fr)';
@@ -1405,15 +1424,16 @@ function viewAllProjects(){
   ${rows.map(r=>calcCard(r.c)).join('')}
 
   <section class="card">
-    <div class="card-h"><h2>Finance planning — all projects</h2><span class="hint">designer / architect working days required across the studio</span></div>
+    <div class="card-h"><h2>Finance planning — all projects</h2><span class="hint">designer / architect working days required across the studio${mixedCalcCurrency?' · totals converted to USD':''}</span></div>
     <div class="card-b">
       <div class="master-row head" style="grid-template-columns:${gc}"><div>Project</div><div class="num">Budget</div><div class="num">Expenses</div><div class="num">Income</div><div class="num">Designer WD</div><div class="num">Architect WD</div></div>
       ${rows.map(r=>`<div class="master-row" style="grid-template-columns:${gc}">
-        <div>${esc(r.c.name)}</div><div class="num">${money(r.c.budget)}</div><div class="num">${money(r.t.expenses)}</div>
-        <div class="num" style="color:${r.t.income>=0?'inherit':'var(--warn-t)'}">${money(r.t.income)}</div>
+        <div>${esc(r.c.name)}${r.cur!=='USD'?` <span class="muted" style="font-size:11px">(${r.cur})</span>`:''}</div>
+        <div class="num">${money(r.c.budget,r.cur)}</div><div class="num">${money(r.t.expenses,r.cur)}</div>
+        <div class="num" style="color:${r.t.income>=0?'inherit':'var(--warn-t)'}">${money(r.t.income,r.cur)}</div>
         <div class="num">${r.t.designTotal}</div><div class="num">${r.t.archTotal}</div></div>`).join('')}
       <div class="master-row total" style="grid-template-columns:${gc}">
-        <div>Total</div><div class="num">${money(total.budget)}</div><div class="num">${money(total.expenses)}</div>
+        <div>Total${mixedCalcCurrency?' (USD)':''}</div><div class="num">${money(total.budget)}</div><div class="num">${money(total.expenses)}</div>
         <div class="num" style="color:${total.income>=0?'inherit':'var(--warn-t)'}">${money(total.income)}</div>
         <div class="num">${total.d}</div><div class="num">${total.ar}</div></div>
       <div class="master-row derived" style="grid-template-columns:${gc}">
@@ -1598,7 +1618,7 @@ document.addEventListener('click', e=>{
   }
   if(el('[data-calc-newproj]')){
     const id='c'+Date.now()%100000;
-    CALC.push({id, name:'New project', budget:0, pmFee:0, designRate:115, archRate:90, archExecutor:null, committedProjectId:null,
+    CALC.push({id, name:'New project', budget:0, pmFee:0, designRate:115, archRate:90, currency:'USD', archExecutor:null, committedProjectId:null,
       floors:[{name:'Ground Floor', rooms:1, eff:2, executor:null}], ext:null, outsourceExt:null, dwgInt:[{name:'Drawings', eff:5}], dwgExt:[]});
     render(); return;
   }
@@ -1663,6 +1683,7 @@ document.addEventListener('change', e=>{
     if(f==='name'){ c.name=t.value; render(); return; }
     if(['budget','designRate','archRate','pmFee'].includes(f)){ c[f]=Math.max(0,+t.value||0); render(); return; }
     if(f==='ext'){ c.ext[p]=Math.max(0,+t.value||0); render(); return; }
+    if(f==='currency'){ c.currency=t.value; render(); return; }
     if(f==='outsourceExt'){ c.outsourceExt.cost=Math.max(0,+t.value||0); render(); return; }
     if(f==='floorExec'){ c.floors[i].executor = t.value||null; render(); return; }
     if(f==='extExec'){ c.ext.executor = t.value||null; render(); return; }
