@@ -179,9 +179,13 @@ h1{font-size:34px;font-weight:500;letter-spacing:-.025em;margin:0}
 .calc-sec:last-child{margin-bottom:0}
 .calc-sec-h{font-size:13px;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline}
 .calc-sec-h .muted{text-transform:none;letter-spacing:0;font-weight:400;font-size:12.5px}
-.calc-row{display:grid;grid-template-columns:1.4fr .8fr .9fr .7fr 26px;gap:8px;align-items:center;margin-bottom:6px}
+.calc-row{display:grid;grid-template-columns:1.1fr .55fr .65fr 1.05fr .6fr 26px;gap:8px;align-items:center;margin-bottom:6px}
 .calc-row.head{color:var(--muted);font-size:11.5px;margin-bottom:8px}
 .calc-row2{display:grid;grid-template-columns:1.4fr .9fr .7fr 26px;gap:8px;align-items:center;margin-bottom:6px}
+.calc-row select,.calc-row2 select,.calc-exec select{border:1px solid var(--line);background:var(--line-2);border-radius:8px;padding:8px 9px;font-size:13px;width:100%}
+.calc-exec{display:flex;align-items:center;gap:10px;margin:2px 0 12px}
+.calc-exec span{color:var(--muted);font-size:12.5px;white-space:nowrap}
+.badge-done{display:inline-flex;align-items:center;gap:6px;background:var(--appr);color:var(--appr-t);border-radius:20px;padding:5px 12px;font-size:12.5px}
 .calc-row input,.calc-row2 input{border:1px solid var(--line);background:var(--line-2);border-radius:8px;padding:8px 9px;font-size:13.5px;width:100%}
 .calc-row .num,.calc-row2 .num{text-align:right;font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .rm{color:var(--muted);font-size:16px;line-height:1;padding:6px;border-radius:7px}
@@ -364,18 +368,18 @@ zone({p:'tanger1', d:'wd', floor:'LS',      n:1, name:'Landscape',   effort:3, s
    Незалежний від Z/Sx — це проектно-кошторисний рівень, а не операційний.
    ====================================================================== */
 let CALC = [
-  {id:'c1', name:'Tanger 1', budget:18800, pmFee:700, designRate:115, archRate:90,
-    floors:[{name:'Floor - Sol', rooms:6, eff:2}, {name:'RDC', rooms:5, eff:2}, {name:'Floor - Etage', rooms:9, eff:2}],
-    ext:{zones:1, eff:7}, outsourceExt:null,
+  {id:'c1', name:'Tanger 1', budget:18800, pmFee:700, designRate:115, archRate:90, archExecutor:null, committedProjectId:null,
+    floors:[{name:'Floor - Sol', rooms:6, eff:2, executor:null}, {name:'RDC', rooms:5, eff:2, executor:null}, {name:'Floor - Etage', rooms:9, eff:2, executor:null}],
+    ext:{zones:1, eff:7, executor:null}, outsourceExt:null,
     dwgInt:[{name:'Floor -1', eff:8}, {name:'RDC', eff:8}, {name:'Floor 2', eff:8}],
     dwgExt:[{name:'AD', eff:5}, {name:'Landscape', eff:5}]},
-  {id:'c2', name:'D10 Palm', budget:30000, pmFee:1000, designRate:115, archRate:90,
-    floors:[{name:'Ground Floor', rooms:7, eff:2}, {name:'1st Floor', rooms:7, eff:2}],
-    ext:{zones:1, eff:7}, outsourceExt:null,
+  {id:'c2', name:'D10 Palm', budget:30000, pmFee:1000, designRate:115, archRate:90, archExecutor:null, committedProjectId:null,
+    floors:[{name:'Ground Floor', rooms:7, eff:2, executor:null}, {name:'1st Floor', rooms:7, eff:2, executor:null}],
+    ext:{zones:1, eff:7, executor:null}, outsourceExt:null,
     dwgInt:[{name:'Ground floor', eff:10}, {name:'1st Floor', eff:10}],
     dwgExt:[{name:'AD', eff:5}, {name:'Landscape', eff:5}]},
-  {id:'c3', name:'Vida', budget:6380, pmFee:300, designRate:115, archRate:90,
-    floors:[{name:'Floor 30', rooms:8, eff:2}],
+  {id:'c3', name:'Vida', budget:6380, pmFee:300, designRate:115, archRate:90, archExecutor:null, committedProjectId:null,
+    floors:[{name:'Floor 30', rooms:8, eff:2, executor:null}],
     ext:null, outsourceExt:null,
     dwgInt:[{name:'WD', eff:20}],
     dwgExt:[]},
@@ -855,6 +859,48 @@ function donut(b, dc){
 /* ======================================================================
    VIEW 2 · STUDIO LOAD
    ====================================================================== */
+const PROJECT_PALETTE = ['#EDC9CD','#CBD9EC','#F1DDB5','#D3E2DA','#DCD5F0','#E7C9A9','#C9E4D8','#E3C9DE'];
+function teamLoadPanel(){
+  const live = PROJECTS.filter(p=>p.status==='confirmed');
+  const projColor = {}; live.forEach((p,i)=>projColor[p.id]=PROJECT_PALETTE[i%PROJECT_PALETTE.length]);
+  const byPerson = TEAM.map(m=>{
+    const byProj = {};
+    Z.filter(z=>z.a===m.id && proj(z.p).status==='confirmed').forEach(z=>{
+      const d = active(z); if(!d) return;
+      byProj[z.p] = (byProj[z.p]||0) + d;
+    });
+    const total = Object.values(byProj).reduce((a,b)=>a+b,0);
+    return {m, byProj, total};
+  });
+  const grand = byPerson.reduce((n,x)=>n+x.total,0);
+  const maxTotal = Math.max(1,...byPerson.map(x=>x.total));
+  return `<section class="card" style="margin-bottom:16px">
+    <div class="card-h"><h2>Team load</h2><span class="hint">remaining assigned days per person, by project</span></div>
+    <div class="card-b">
+      ${byPerson.map(x=>{
+        const entries = Object.entries(x.byProj).sort((a,b)=>b[1]-a[1]);
+        return `<div style="margin-bottom:18px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+            <span style="font-size:15px">${x.m.name} <span class="muted" style="font-size:12.5px">· ${DISC[x.m.team].role}</span></span>
+            <span class="money" style="font-size:15px">${x.total} d</span>
+          </div>
+          <div style="height:14px;border-radius:7px;background:var(--line-2);overflow:hidden;display:flex">
+            ${entries.length? entries.map(([pid,d])=>`<div style="width:${Math.max(2,d/maxTotal*100)}%;background:${projColor[pid]}" title="${esc(proj(pid).name)}: ${d}d"></div>`).join('') : ''}
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:7px">
+            ${entries.length? entries.map(([pid,d])=>`<span class="muted" style="font-size:11.5px;display:inline-flex;align-items:center;gap:5px">
+              <i style="width:9px;height:9px;border-radius:3px;background:${projColor[pid]};display:inline-block"></i>${esc(proj(pid).name)} · ${d}d</span>`).join('')
+              : '<span class="muted" style="font-size:11.5px">no assigned work</span>'}
+          </div>
+        </div>`;
+      }).join('')}
+      <div style="border-top:1px solid var(--line);padding-top:13px;margin-top:2px;display:flex;justify-content:space-between;font-size:15px">
+        <span>Studio total, all confirmed projects</span><span class="money" style="font-weight:500">${grand} d</span>
+      </div>
+    </div>
+  </section>`;
+}
+
 function viewLoad(){
   const r = range();
   const live = Z.filter(z=>proj(z.p).status==='confirmed');
@@ -884,6 +930,8 @@ function viewLoad(){
     <div class="kpi ${over.length?'warn':''}"><div class="l">Overloaded</div><div class="v">${over.length? over[0].m.name+' +'+over[0].n+'d':'No one'}</div>
       <div class="f">${over.length? 'work beyond '+fmt(r.end) : 'everything fits the window'}</div></div>
   </div>
+
+  ${teamLoadPanel()}
 
   <section class="card" style="margin-bottom:16px">
     <div class="card-h"><h2>Projects × weeks</h2><span class="hint">one line = one project stage · bar = who and how many days</span></div>
@@ -1153,21 +1201,31 @@ function lineRows(c, key, label){
     <button class="add" data-calc-add="${c.id}" data-af="${key}">+ add line</button>
   </div>`;
 }
+function execSelect(team, value, attrs){
+  return `<select ${attrs}><option value="">Not assigned</option>
+    ${TEAM.filter(m=>m.team===team).map(m=>`<option value="${m.id}" ${value===m.id?'selected':''}>${m.name}</option>`).join('')}</select>`;
+}
 function calcCard(c){
   const t = calcTotals(c);
+  const zonesTotal = c.floors.reduce((n,f)=>n+f.rooms,0) + (c.ext? c.ext.zones : 0) + c.dwgInt.length + c.dwgExt.length;
   return `<section class="card" style="margin-bottom:16px">
     <div class="card-h">
       <input class="calc-title" value="${esc(c.name)}" data-calc="${c.id}" data-f="name" aria-label="Project name">
       <span class="hint">Design ${t.designTotal}d · Arch ${t.archTotal}d</span>
+      <div class="spacer"></div>
+      ${c.committedProjectId
+        ? `<span class="badge-done">✓ In production</span><button class="pill" data-goto="${c.committedProjectId}|viz">Open →</button>`
+        : `<button class="btn" data-calc-commit="${c.id}">Create in Production</button>`}
     </div>
     <div class="card-b">
       <div class="calc-sec">
         <div class="calc-sec-h">3D — Interior<span class="muted">${t.designInt}d</span></div>
-        <div class="calc-row head"><div>Floor</div><div>Rooms</div><div>Effort/room</div><div>Total</div><div></div></div>
+        <div class="calc-row head"><div>Floor</div><div>Rooms</div><div>Effort/room</div><div>Executor</div><div>Total</div><div></div></div>
         ${c.floors.map((f,i)=>`<div class="calc-row">
           <input value="${esc(f.name)}" data-calc="${c.id}" data-f="floors" data-i="${i}" data-p="name">
           <input type="number" min="0" value="${f.rooms}" data-calc="${c.id}" data-f="floors" data-i="${i}" data-p="rooms">
           <input type="number" min="0" value="${f.eff}" data-calc="${c.id}" data-f="floors" data-i="${i}" data-p="eff">
+          ${execSelect('viz', f.executor, `data-calc="${c.id}" data-f="floorExec" data-i="${i}"`)}
           <div class="num">${f.rooms*f.eff}d</div>
           <button class="rm" data-calc-rm="${c.id}" data-rf="floors" data-i="${i}" aria-label="Remove floor">×</button>
         </div>`).join('')}
@@ -1177,10 +1235,11 @@ function calcCard(c){
       <div class="calc-sec">
         <div class="calc-sec-h">3D — Exterior${c.ext?`<span class="muted">${t.designExt}d</span>`:''}</div>
         ${c.ext? `
-          <div class="calc-row" style="grid-template-columns:1.4fr .8fr .9fr .7fr 26px">
+          <div class="calc-row" style="grid-template-columns:1.1fr .55fr .65fr 1.05fr .6fr 26px">
             <div class="muted" style="font-size:13px">Zones</div>
             <input type="number" min="0" value="${c.ext.zones}" data-calc="${c.id}" data-f="ext" data-p="zones">
             <input type="number" min="0" value="${c.ext.eff}" data-calc="${c.id}" data-f="ext" data-p="eff">
+            ${execSelect('viz', c.ext.executor, `data-calc="${c.id}" data-f="extExec"`)}
             <div class="num">${t.designExt}d</div>
             <button class="rm" data-calc-rmext="${c.id}" aria-label="Remove exterior scope">×</button>
           </div>
@@ -1195,6 +1254,7 @@ function calcCard(c){
         ` : `<button class="add" data-calc-addext="${c.id}">+ add exterior scope</button>`}
       </div>
 
+      <div class="calc-exec"><span>Architect (all drawings)</span>${execSelect('wd', c.archExecutor, `data-calc="${c.id}" data-f="archExec" style="max-width:220px"`)}</div>
       ${lineRows(c,'dwgInt','Drawings — Interior')}
       ${lineRows(c,'dwgExt','Drawings — Exterior')}
 
@@ -1220,6 +1280,43 @@ function calcCard(c){
     </div>
   </section>`;
 }
+function uniqueProjectId(base){
+  let id=base, n=2;
+  while(PROJECTS.some(p=>p.id===id)){ id=base+'-'+n; n++; }
+  return id;
+}
+function commitCalcToProduction(c){
+  const id = uniqueProjectId(c.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'project');
+  const prio = Math.max(0,...PROJECTS.map(p=>p.prio))+1;
+  PROJECTS.push({id, name:c.name, prio, status:'confirmed', revenue:c.budget||0});
+  dbSaveProject(PROJECTS[PROJECTS.length-1]);
+
+  const before = Z.length;
+  c.floors.forEach(f=>{
+    for(let n=1; n<=f.rooms; n++){
+      zone({p:id, d:'viz', floor:f.name, n, name:'Room '+String(n).padStart(2,'0'), effort:f.eff, status:'pending', a:f.executor||null});
+    }
+  });
+  if(c.ext && c.ext.zones>0){
+    const perZone = c.outsourceExt ? Math.round(c.outsourceExt.cost / c.ext.zones) : null;
+    for(let n=1; n<=c.ext.zones; n++){
+      zone({p:id, d:'viz', floor:'Exterior', n, name: c.ext.zones>1? 'Exterior '+n : 'Exterior', effort:c.ext.eff,
+        status:'pending', a: c.outsourceExt? null : (c.ext.executor||null),
+        outsource: perZone!=null? {cost:perZone} : undefined});
+    }
+  }
+  c.dwgInt.forEach((x,i)=>zone({p:id, d:'wd', floor:x.name, n:i+1, name:x.name, effort:x.eff, status:'pending', a:c.archExecutor||null}));
+  c.dwgExt.forEach((x,i)=>zone({p:id, d:'wd', floor:x.name, n:i+1, name:x.name, effort:x.eff, status:'pending', a:c.archExecutor||null}));
+  const added = Z.slice(before);
+  added.forEach(dbSaveZone);
+
+  c.committedProjectId = id;
+  S = build();
+  state.tab='production'; state.project=id; state.disc='viz';
+  render(); window.scrollTo({top:0});
+  toast(`${c.name} is in Production · ${added.length} zones created`);
+}
+
 function viewAllProjects(){
   const rows = CALC.map(c=>({c, t:calcTotals(c)}));
   const total = rows.reduce((a,r)=>({budget:a.budget+r.c.budget, expenses:a.expenses+r.t.expenses, income:a.income+r.t.income,
@@ -1400,7 +1497,7 @@ document.addEventListener('click', e=>{
   }
   if(n=el('[data-calc-add]')){
     const c=CALC.find(x=>x.id===n.dataset.calcAdd); const f=n.dataset.af;
-    if(f==='floors') c.floors.push({name:'New floor', rooms:1, eff:2});
+    if(f==='floors') c.floors.push({name:'New floor', rooms:1, eff:2, executor:null});
     else c[f].push({name:'New line', eff:2});
     render(); return;
   }
@@ -1408,7 +1505,7 @@ document.addEventListener('click', e=>{
     const c=CALC.find(x=>x.id===n.dataset.calcRm); c[n.dataset.rf].splice(+n.dataset.i,1); render(); return;
   }
   if(n=el('[data-calc-addext]')){
-    const c=CALC.find(x=>x.id===n.dataset.calcAddext); c.ext={zones:1, eff:7}; render(); return;
+    const c=CALC.find(x=>x.id===n.dataset.calcAddext); c.ext={zones:1, eff:7, executor:null}; render(); return;
   }
   if(n=el('[data-calc-rmext]')){
     const c=CALC.find(x=>x.id===n.dataset.calcRmext); c.ext=null; c.outsourceExt=null; render(); return;
@@ -1421,9 +1518,14 @@ document.addEventListener('click', e=>{
   }
   if(el('[data-calc-newproj]')){
     const id='c'+Date.now()%100000;
-    CALC.push({id, name:'New project', budget:0, pmFee:0, designRate:115, archRate:90,
-      floors:[{name:'Ground Floor', rooms:1, eff:2}], ext:null, outsourceExt:null, dwgInt:[{name:'Drawings', eff:5}], dwgExt:[]});
+    CALC.push({id, name:'New project', budget:0, pmFee:0, designRate:115, archRate:90, archExecutor:null, committedProjectId:null,
+      floors:[{name:'Ground Floor', rooms:1, eff:2, executor:null}], ext:null, outsourceExt:null, dwgInt:[{name:'Drawings', eff:5}], dwgExt:[]});
     render(); return;
+  }
+  if(n=el('[data-calc-commit]')){
+    const c=CALC.find(x=>x.id===n.dataset.calcCommit); if(!c || c.committedProjectId) return;
+    commitCalcToProduction(c);
+    return;
   }
   if(el('[data-confirm]')){
     const sm=state.sim, o=scenarios(+sm.effort, sm.team)[sm.pick]; if(!o) return;
@@ -1453,6 +1555,9 @@ document.addEventListener('change', e=>{
     if(['budget','designRate','archRate','pmFee'].includes(f)){ c[f]=Math.max(0,+t.value||0); render(); return; }
     if(f==='ext'){ c.ext[p]=Math.max(0,+t.value||0); render(); return; }
     if(f==='outsourceExt'){ c.outsourceExt.cost=Math.max(0,+t.value||0); render(); return; }
+    if(f==='floorExec'){ c.floors[i].executor = t.value||null; render(); return; }
+    if(f==='extExec'){ c.ext.executor = t.value||null; render(); return; }
+    if(f==='archExec'){ c.archExecutor = t.value||null; render(); return; }
     if(f==='floors'||f==='dwgInt'||f==='dwgExt'){ c[f][i][p] = p==='name'? t.value : Math.max(0,+t.value||0); render(); return; }
   }
 });
