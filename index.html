@@ -305,13 +305,13 @@ async function dbSavePotential(pp){ if(!sb) return; const {error}=await sb.from(
 const TODAY = new Date('2026-09-21T00:00:00');
 
 const TEAM = [
-  {id:'OL', name:'Olia',    team:'viz', color:'#EDC9CD', rate:2300},
-  {id:'IR', name:'Ira',     team:'viz', color:'#DCD5F0', rate:2100},
-  {id:'EV', name:'Evgeniy', team:'viz', color:'#F1DDB5', rate:1900},
-  {id:'AN', name:'Anton',   team:'wd',  color:'#CBD9EC', rate:2000},
-  {id:'KT', name:'Kate',    team:'wd',  color:'#D3E2DA', rate:1800},
+  {id:'OL', name:'Olia',    team:'viz', color:'#EDC9CD', rate:2300, type:'staff'},
+  {id:'IR', name:'Ira',     team:'viz', color:'#DCD5F0', rate:0,    type:'freelance'},
+  {id:'EV', name:'Evgeniy', team:'viz', color:'#F1DDB5', rate:1900, type:'staff'},
+  {id:'AN', name:'Julia',   team:'wd',  color:'#CBD9EC', rate:2000, type:'staff'},
+  {id:'KT', name:'Maria',   team:'wd',  color:'#D3E2DA', rate:1800, type:'staff'},
 ];
-/* rate = monthly in-house salary, USD. Editable in the Finance tab. */
+/* rate = monthly in-house salary, USD (ignored for type:'freelance' — their cost is set per zone). Editable in the Finance tab. */
 const DISC = {
   viz:{name:'Interior 3D',     short:'3D',       unit:'rooms',    unit1:'room',    role:'Designer',  roles:'Designers',  color:'var(--viz)'},
   wd: {name:'Working drawings',short:'drawings', unit:'packages', unit1:'package', role:'Architect', roles:'Architects', color:'var(--wd)'},
@@ -335,6 +335,7 @@ let Z = [];
 let seq = 0;
 function zone(o){ Z.push({id:'z'+(++seq), revEffort:1, earliest:iso(TODAY), reason:null, ...o}); }
 const MAP = {A:'approved', R:'revision', P:'paused', N:'pending'};
+function outsourceFor(a){ return a && TEAM.find(m=>m.id===a && m.type==='freelance') ? {cost:0} : undefined; }
 function floorRooms(p, floor, code, effort, a, earliest){
   [...code].forEach((c,i)=>zone({p, d:'viz', floor, n:i+1, name:'Room '+String(i+1).padStart(2,'0'),
     effort, status:MAP[c], a, earliest, reason: c==='P'?'Waiting for client':null}));
@@ -344,23 +345,31 @@ floorRooms('tanger1','Ground','AAARAAPARNN',2,'OL');
 floorRooms('tanger1','First', 'AARANNNNNPN',2,'OL');
 floorRooms('tanger1','Second','ARNNNNNNNNN',2,'OL');
 zone({p:'tanger1', d:'viz', floor:'Exterior', n:1, name:'Exterior', effort:7, status:'pending', a:'IR', earliest:'2026-10-05', outsource:{cost:1500}});
-// Majed · 3D
-[['1 floor',1,1,'R'],['1 floor',2,2,'A'],['1 floor',3,1,'A'],['1 floor',4,1,'R'],['1 floor',5,1,'R'],['1 floor',6,1,'P'],['1 floor',7,1,'P'],
- ['2 floor',5,1,'A'],['2 floor',6,1,'A']].forEach(([f,n,e,c])=>zone({p:'majed', d:'viz', floor:f, n, name:'Room '+String(n).padStart(2,'0'),
-   effort:e, status:MAP[c], a:'EV', reason:c==='P'?'Waiting for client':null}));
+// Majed Palm villa · 3D — Ground Floor (all done, Evgeniy)
+[['Formal living room (20)',2,'A'],['Garage',1,'A'],['Gym',1,'A'],['WC (3)',2,'A'],['Hall GF',1.5,'A']]
+  .forEach(([nm,e,c],i)=>zone({p:'majed', d:'viz', floor:'Ground Floor', n:i+1, name:nm, effort:e, status:MAP[c], a:'EV'}));
+// Majed · 3D — First Floor: Evgeniy on the main suite + guest rooms 3–4, Olia on guest rooms 1–2
+[['Hall FF',1.5,'A','EV'],['Master bedroom (04)',2,'A','EV'],['Master bathroom (06)',0.5,'N','EV'],['Master closet (05)',0.5,'A','EV'],
+ ['Bedroom 4 (17)',1,'N','EV'],['Bathroom 4 (19)',0.5,'N','EV'],['Bedroom 3 (13)',1,'N','EV'],['Bathroom 3 (14)',0.5,'N','EV'],
+ ['Bedroom 1 (07)',1,'N','OL'],['Bathroom 1 (09)',0.5,'N','OL'],['Bedroom 2 (10)',1,'N','OL'],['Bathroom 2 (12)',0.5,'N','OL']]
+  .forEach(([nm,e,c,a],i)=>zone({p:'majed', d:'viz', floor:'First Floor', n:i+1, name:nm, effort:e, status:MAP[c], a}));
 // Vida · 3D
 for(let i=1;i<=7;i++) zone({p:'vida', d:'viz', floor:'Ground', n:i, name:'Room '+String(i).padStart(2,'0'), effort:2, status:'pending', a:'IR'});
 // Gunther
 zone({p:'gunther', d:'viz', floor:'Hall', n:1, name:'Dining hall', effort:4, status:'revision', revEffort:2, a:'IR', earliest:'2026-10-19'});
 // Креслення — стартують після 3D поверху + 3 дні на затвердження
 const dep = (p,floor)=>({p, floor, lag:3});
-zone({p:'majed', d:'wd', floor:'Interior', n:1, name:'Interior drawings', effort:17, status:'pending', a:'KT'});
-zone({p:'majed', d:'wd', floor:'Exterior',  n:2, name:'Exterior drawings',  effort:10, status:'pending', a:'KT', earliest:'2026-10-12'});
+// Majed · Drawings — Ground Floor 350 m² + First Floor 300 m², all Maria (id 'KT')
+[['Ground Floor',1,'Plans',14],['Ground Floor',2,'Elevations',14],['Ground Floor',3,'Technical requirements',14],
+ ['First Floor', 1,'Plans',14],['First Floor', 2,'Elevations',14],['First Floor', 3,'Technical requirements',14]]
+  .forEach(([f,n,nm,e])=>zone({p:'majed', d:'wd', floor:f, n, name:nm, effort:e, status:'pending', a:'KT'}));
 zone({p:'vida',    d:'wd', floor:'Ground',  n:1, name:'Drawing set', effort:10,status:'pending', a:'AN', after:dep('vida','Ground')});
 zone({p:'tanger1', d:'wd', floor:'Ground',  n:1, name:'Ground set',  effort:7, status:'pending', a:'KT', after:dep('tanger1','Ground')});
 zone({p:'tanger1', d:'wd', floor:'First',   n:1, name:'First set',   effort:7, status:'pending', a:'KT', after:dep('tanger1','First')});
 zone({p:'tanger1', d:'wd', floor:'AD',      n:1, name:'Arch. details',effort:3, status:'pending', a:'KT'});
 zone({p:'tanger1', d:'wd', floor:'LS',      n:1, name:'Landscape',   effort:3, status:'pending', a:'KT'});
+// будь-яка зона фрилансера без вказаної ціни отримує явний $0 до заповнення (замість тихого безкоштовного in-house)
+Z.filter(z=>z.a && TEAM.find(m=>m.id===z.a && m.type==='freelance') && !z.outsource).forEach(z=>z.outsource={cost:0});
 
 /* ======================================================================
    ALL-PROJECTS CALCULATOR — той самий шаблон, що у вихідному Excel:
@@ -478,7 +487,7 @@ function build(extra=[]){
       c.sort((a,b)=>(proj(a.p).prio-proj(b.p).prio) || (floorOrder(a.floor)-floorOrder(b.floor)) || (a.n-b.n));
       const it = c[0];
       it.days.push(key); it.rem--; occ[m.id].set(key, it.id);
-      if(it.rem===0) it.fin = key;
+      if(it.rem<=0) it.fin = key;
     });
   }
   items.forEach(x=>{ if(x.days.length){ x.s=x.days[0]; x.e=x.days[x.days.length-1]; } });
@@ -634,7 +643,15 @@ function dailyRate(id, k){
   return (person(id).rate||0)/wd;
 }
 /* нинішній «номінальний» день-рейт — для ще незапланованих (paused/без ресурсу) зон */
-function nominalRate(id){ return (person(id).rate||0)/21 }
+function isFreelance(id){ return person(id).type==='freelance' }
+function nominalRate(id){ return isFreelance(id) ? 0 : (person(id).rate||0)/21 }
+async function dbSaveTeam(m){ if(!sb) return; const {error}=await sb.from('studio_team').upsert({id:m.id,name:m.name,team:m.team,color:m.color,rate:m.rate||0,type:m.type||'staff'}); if(error) toast('Not saved: '+error.message); }
+async function dbDeleteTeamMember(id){ if(!sb) return; const {error}=await sb.from('studio_team').delete().eq('id',id); if(error) toast('Not deleted: '+error.message); }
+function uniqueTeamId(name){
+  let base=(name.replace(/[^a-zA-Z]/g,'').slice(0,2)||'M').toUpperCase(), id=base, n=2;
+  while(TEAM.some(m=>m.id===id)){ id=base+n; n++; }
+  return id;
+}
 
 /* {ym: {inhouse, outsource, total, byPerson:[{id,days,cost}], byOutsource:[{name,cost}]}} по проєкту, з рушія Sx */
 function monthlyCost(pid, Sx){
@@ -744,7 +761,7 @@ function viewProduction(){
           return `<div class="floor">
             <div><div class="fn">${esc(f)}</div><div class="fc">${done} / ${fz.length} approved${fz.some(z=>z.outsource)?' · <span style=\"color:var(--pot-t)\">outsourced</span>':''}</div></div>
             <div class="pills">${fz.map(z=>`<button class="pill ${z.status} ${state.selZone===z.id?'sel':''}" data-zone="${z.id}"
-                title="${esc(z.name)} · ${STATUS[z.status].lab} · ${z.effort}d${z.a?' · '+person(z.a).name:''}">${state.disc==='viz'&&/^Room/.test(z.name)?String(z.n).padStart(2,'0'):esc(z.name)}</button>`).join('')}
+                title="${esc(z.name)} · ${STATUS[z.status].lab} · ${z.effort}d${z.a?' · '+person(z.a).name:''}">${state.disc==='viz'?String(z.n).padStart(2,'0'):esc(z.name)}</button>`).join('')}
               <button class="pill add" data-add="${esc(f)}" title="Add ${dc.unit1}">+</button></div>
             <div class="left">${left? left+'d left' : '<span style="color:var(--appr-t)">done</span>'}</div>
           </div>`;
@@ -1151,11 +1168,38 @@ function viewFinance(){
     </section>
 
     <section class="card">
-      <div class="card-h"><h2>Team rates</h2><span class="hint">monthly in-house salary, USD</span></div>
+      <div class="card-h"><h2>Team</h2><span class="hint">add, edit or remove designers and architects</span></div>
       <div class="card-b">
-        ${TEAM.map(m=>`<div class="ratebox"><span>${m.name} <span class="muted" style="font-size:12.5px">· ${DISC[m.team].role}</span></span>
-          <input type="number" min="0" step="50" value="${m.rate}" data-rate="${m.id}"></div>`).join('')}
-        <div class="muted" style="font-size:12px;margin-top:10px">Daily cost = monthly salary ÷ working days in that calendar month.</div>
+        ${TEAM.map(m=>{
+          const busy = Z.some(z=>z.a===m.id);
+          return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:11px 0;border-bottom:1px solid var(--line-2)">
+          <input value="${esc(m.name)}" data-team-name="${m.id}" style="flex:1;min-width:110px;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13.5px">
+          <select data-team-role="${m.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13px">
+            <option value="viz" ${m.team==='viz'?'selected':''}>Designer</option>
+            <option value="wd" ${m.team==='wd'?'selected':''}>Architect</option>
+          </select>
+          <select data-team-type="${m.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13px">
+            <option value="staff" ${m.type!=='freelance'?'selected':''}>In-house</option>
+            <option value="freelance" ${m.type==='freelance'?'selected':''}>Outsource</option>
+          </select>
+          ${m.type==='freelance'
+            ? '<span class="muted" style="font-size:12px;min-width:130px">cost set per project</span>'
+            : `<input type="number" min="0" step="50" value="${m.rate}" data-rate="${m.id}" aria-label="Monthly rate" style="width:100px;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13.5px">`}
+          <button class="rm" data-team-rm="${m.id}" ${busy?'disabled title="Reassign their zones first"':''} aria-label="Remove">×</button>
+        </div>`;
+        }).join('')}
+        <div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:16px">
+          <input id="newTeamName" placeholder="Name" style="flex:1;min-width:110px;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13.5px">
+          <select id="newTeamRole" style="border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13px">
+            <option value="viz">Designer</option><option value="wd">Architect</option>
+          </select>
+          <select id="newTeamType" style="border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13px">
+            <option value="staff">In-house</option><option value="freelance">Outsource</option>
+          </select>
+          <input id="newTeamRate" type="number" min="0" step="50" placeholder="Rate/month" style="width:100px;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13.5px">
+          <button class="btn" data-team-add>+ Add</button>
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:12px">In-house daily cost = monthly salary ÷ working days in that calendar month. Outsource cost is set per zone (Delivery field), so it can differ project to project — even interior vs exterior on the same project.</div>
       </div>
     </section>
   </div>
@@ -1294,7 +1338,7 @@ function commitCalcToProduction(c){
   const before = Z.length;
   c.floors.forEach(f=>{
     for(let n=1; n<=f.rooms; n++){
-      zone({p:id, d:'viz', floor:f.name, n, name:'Room '+String(n).padStart(2,'0'), effort:f.eff, status:'pending', a:f.executor||null});
+      zone({p:id, d:'viz', floor:f.name, n, name:'Room '+String(n).padStart(2,'0'), effort:f.eff, status:'pending', a:f.executor||null, outsource:outsourceFor(f.executor)});
     }
   });
   if(c.ext && c.ext.zones>0){
@@ -1302,11 +1346,11 @@ function commitCalcToProduction(c){
     for(let n=1; n<=c.ext.zones; n++){
       zone({p:id, d:'viz', floor:'Exterior', n, name: c.ext.zones>1? 'Exterior '+n : 'Exterior', effort:c.ext.eff,
         status:'pending', a: c.outsourceExt? null : (c.ext.executor||null),
-        outsource: perZone!=null? {cost:perZone} : undefined});
+        outsource: perZone!=null? {cost:perZone} : outsourceFor(c.ext.executor)});
     }
   }
-  c.dwgInt.forEach((x,i)=>zone({p:id, d:'wd', floor:x.name, n:i+1, name:x.name, effort:x.eff, status:'pending', a:c.archExecutor||null}));
-  c.dwgExt.forEach((x,i)=>zone({p:id, d:'wd', floor:x.name, n:i+1, name:x.name, effort:x.eff, status:'pending', a:c.archExecutor||null}));
+  c.dwgInt.forEach((x,i)=>zone({p:id, d:'wd', floor:x.name, n:i+1, name:x.name, effort:x.eff, status:'pending', a:c.archExecutor||null, outsource:outsourceFor(c.archExecutor)}));
+  c.dwgExt.forEach((x,i)=>zone({p:id, d:'wd', floor:x.name, n:i+1, name:x.name, effort:x.eff, status:'pending', a:c.archExecutor||null, outsource:outsourceFor(c.archExecutor)}));
   const added = Z.slice(before);
   added.forEach(dbSaveZone);
 
@@ -1377,24 +1421,30 @@ function openZone(id){
       <div class="muted" style="font-size:12.5px;margin-top:7px">Paused ${dc.unit1} releases the ${dc.role.toLowerCase()} — the calendar gives those days to other work.</div></div>`:''}
 
     <div class="field"><div class="fl">First version effort</div>
-      <div class="stepper"><button data-eff="-1">−</button><span>${z.effort} d</span><button data-eff="1">+</button></div></div>
+      <div class="stepper"><button data-eff="-0.5">−</button><span>${z.effort} d</span><button data-eff="0.5">+</button></div></div>
 
     ${z.status==='revision'?`<div class="field"><div class="fl">Revision effort</div>
-      <div class="stepper"><button data-rev="-1">−</button><span>${z.revEffort} d</span><button data-rev="1">+</button></div></div>`:''}
+      <div class="stepper"><button data-rev="-0.5">−</button><span>${z.revEffort} d</span><button data-rev="0.5">+</button></div></div>`:''}
 
     <div class="field"><div class="fl">${dc.role}</div>
       <select data-assign><option value="">Not assigned</option>
-      ${TEAM.filter(m=>m.team===z.d).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${m.name}</option>`).join('')}</select></div>
+      ${TEAM.filter(m=>m.team===z.d).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${m.name}${m.type==='freelance'?' (outsource)':''}</option>`).join('')}</select></div>
 
     <div class="field"><div class="fl">Delivery</div>
-      <div class="stbtns">
-        <button data-outsource="off" aria-pressed="${!z.outsource}">In-house</button>
-        <button data-outsource="on"  aria-pressed="${!!z.outsource}" ${!z.a?'disabled':''}>Outsourced</button>
-      </div>
-      ${z.outsource? `<div style="margin-top:10px"><div class="fl">Flat fee, USD</div>
-        <input type="number" min="0" step="50" value="${z.outsource.cost}" data-outfee="${z.id}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
-      </div>` : z.a? `<div class="muted" style="font-size:12.5px;margin-top:8px">
-        In-house ≈ ${money(zoneCostEstimate({...z,outsource:null,status:'pending'}))} at ${person(z.a).name}'s current rate.</div>` : ''}
+      ${isFreelance(z.a) ? `
+        <div class="muted" style="font-size:12.5px;margin-bottom:9px">${esc(person(z.a).name)} is an outsource ${dc.role.toLowerCase()} — cost is set per project, and can differ for interior and exterior work.</div>
+        <div class="fl">Flat fee, USD</div>
+        <input type="number" min="0" step="10" value="${z.outsource?z.outsource.cost:0}" data-outfee="${z.id}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
+      ` : `
+        <div class="stbtns">
+          <button data-outsource="off" aria-pressed="${!z.outsource}">In-house</button>
+          <button data-outsource="on"  aria-pressed="${!!z.outsource}" ${!z.a?'disabled':''}>Outsourced</button>
+        </div>
+        ${z.outsource? `<div style="margin-top:10px"><div class="fl">Flat fee, USD</div>
+          <input type="number" min="0" step="50" value="${z.outsource.cost}" data-outfee="${z.id}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
+        </div>` : z.a? `<div class="muted" style="font-size:12.5px;margin-top:8px">
+          In-house ≈ ${money(zoneCostEstimate({...z,outsource:null,status:'pending'}))} at ${person(z.a).name}'s current rate.</div>` : ''}
+      `}
     </div>
 
     <div class="note">${
@@ -1447,14 +1497,14 @@ document.addEventListener('click', e=>{
     const tmpl=same[same.length-1]||{effort:2,a:null};
     const num=Math.max(0,...same.map(z=>z.n))+1;
     zone({p:state.project, d:state.disc, floor:f, n:num, name:state.disc==='viz'?'Room '+String(num).padStart(2,'0'):'Package '+num,
-      effort:tmpl.effort, status:'pending', a:tmpl.a});
+      effort:tmpl.effort, status:'pending', a:tmpl.a, outsource:outsourceFor(tmpl.a)});
     dbSaveZone(Z[Z.length-1]);
     S=build(); render(); toast(`${f}: ${DISC[state.disc].unit1} ${num} added · ${tmpl.effort}d`); return;
   }
   const z = curZone();
   if(z && (n=el('[data-set-status]'))){ z.status=n.dataset.setStatus; if(z.status==='paused'&&!z.reason) z.reason=REASONS[0]; changed(`${z.name}: ${STATUS[z.status].lab}`); return; }
-  if(z && (n=el('[data-eff]'))){ z.effort=Math.max(1,z.effort+ +n.dataset.eff); changed(`${z.name}: ${z.effort} days`); return; }
-  if(z && (n=el('[data-rev]'))){ z.revEffort=Math.max(1,z.revEffort+ +n.dataset.rev); changed(`${z.name}: revision ${z.revEffort} days`); return; }
+  if(z && (n=el('[data-eff]'))){ z.effort=Math.max(0.5, Math.round((z.effort+ +n.dataset.eff)*2)/2); changed(`${z.name}: ${z.effort} days`); return; }
+  if(z && (n=el('[data-rev]'))){ z.revEffort=Math.max(0.5, Math.round((z.revEffort+ +n.dataset.rev)*2)/2); changed(`${z.name}: revision ${z.revEffort} days`); return; }
   if(z && (n=el('[data-outsource]'))){
     if(n.dataset.outsource==='on'){ if(!z.a){ toast('Assign a person first'); return; } z.outsource={cost: Math.round(z.effort*nominalRate(z.a))}; }
     else { z.outsource=null; }
@@ -1522,6 +1572,23 @@ document.addEventListener('click', e=>{
       floors:[{name:'Ground Floor', rooms:1, eff:2, executor:null}], ext:null, outsourceExt:null, dwgInt:[{name:'Drawings', eff:5}], dwgExt:[]});
     render(); return;
   }
+  if(n=el('[data-team-rm]')){
+    const id=n.dataset.teamRm;
+    if(Z.some(z=>z.a===id)){ toast('Reassign their zones before removing'); return; }
+    dbDeleteTeamMember(id);
+    const i=TEAM.findIndex(x=>x.id===id); if(i>=0) TEAM.splice(i,1);
+    render(); toast('Removed from the team'); return;
+  }
+  if(el('[data-team-add]')){
+    const name=document.getElementById('newTeamName').value.trim();
+    if(!name){ toast('Enter a name'); return; }
+    const role=document.getElementById('newTeamRole').value;
+    const type=document.getElementById('newTeamType').value;
+    const rate= type==='staff'? Math.max(0,+document.getElementById('newTeamRate').value||0) : 0;
+    const palette=['#EDC9CD','#CBD9EC','#F1DDB5','#D3E2DA','#DCD5F0','#E7C9A9','#C9E4D8'];
+    const m={id:uniqueTeamId(name), name, team:role, type, rate, color:palette[TEAM.length%palette.length]};
+    TEAM.push(m); dbSaveTeam(m); render(); toast(`${name} added to the team`); return;
+  }
   if(n=el('[data-calc-commit]')){
     const c=CALC.find(x=>x.id===n.dataset.calcCommit); if(!c || c.committedProjectId) return;
     commitCalcToProduction(c);
@@ -1543,10 +1610,13 @@ document.addEventListener('click', e=>{
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
   if(t.id==='projSel'){ state.project=t.value; render(); return; }
-  if(z && t.dataset.assign!==undefined){ z.a=t.value||null; if(!z.a) z.outsource=null; changed(`${z.name}: ${z.a?person(z.a).name:'not assigned'}`); return; }
+  if(z && t.dataset.assign!==undefined){ z.a=t.value||null; if(!z.a) z.outsource=null; else if(isFreelance(z.a) && !z.outsource) z.outsource={cost:0}; changed(`${z.name}: ${z.a?person(z.a).name:'not assigned'}`); return; }
   if(z && t.dataset.reason!==undefined){ z.reason=t.value; changed(`${z.name}: ${z.reason}`); return; }
-  if(z && t.dataset.outfee!==undefined){ z.outsource.cost=Math.max(0,+t.value||0); changed(`${z.name}: outsourced · ${money(z.outsource.cost)}`); return; }
-  if(t.dataset.rate!==undefined){ const m=person(t.dataset.rate); m.rate=Math.max(0,+t.value||0); dbSaveRate(m); S=build(); render(); toast(`${m.name}: ${money(m.rate)}/month`); return; }
+  if(z && t.dataset.outfee!==undefined){ if(!z.outsource) z.outsource={cost:0}; z.outsource.cost=Math.max(0,+t.value||0); changed(`${z.name}: outsourced · ${money(z.outsource.cost)}`); return; }
+  if(t.dataset.teamName!==undefined){ const m=person(t.dataset.teamName); m.name=t.value.trim()||m.name; dbSaveTeam(m); render(); return; }
+  if(t.dataset.teamRole!==undefined){ const m=person(t.dataset.teamRole); m.team=t.value; dbSaveTeam(m); S=build(); render(); return; }
+  if(t.dataset.teamType!==undefined){ const m=person(t.dataset.teamType); m.type=t.value; if(m.type==='freelance') m.rate=0; dbSaveTeam(m); S=build(); render(); return; }
+  if(t.dataset.rate!==undefined){ const m=person(t.dataset.rate); m.rate=Math.max(0,+t.value||0); dbSaveTeam(m); S=build(); render(); toast(`${m.name}: ${money(m.rate)}/month`); return; }
   if(t.dataset.calcbuf!==undefined){ state.calcBuffer=Math.max(1,+t.value||1); render(); return; }
   if(t.dataset.calc!==undefined){
     const c=CALC.find(x=>x.id===t.dataset.calc); if(!c) return;
@@ -1575,7 +1645,7 @@ async function boot(){
       sb.from('studio_potentials').select('*'),
     ]);
     if(team.error||proj.error||zones.error||pot.error) throw (team.error||proj.error||zones.error||pot.error);
-    TEAM.length=0; TEAM.push(...team.data.map(r=>({id:r.id,name:r.name,team:r.team,color:r.color,rate:Number(r.rate)})));
+    TEAM.length=0; TEAM.push(...team.data.map(r=>({id:r.id,name:r.name,team:r.team,color:r.color,rate:Number(r.rate),type:r.type||'staff'})));
     PROJECTS.length=0; PROJECTS.push(...proj.data.map(r=>({id:r.id,name:r.name,prio:r.prio,status:r.status,revenue:Number(r.revenue)})));
     Z.length=0; Z.push(...zones.data.map(fromDbZone));
     state.potentials.length=0; state.potentials.push(...pot.data.map(r=>({id:r.id,name:r.name,effort:Number(r.effort),team:r.team,revenue:Number(r.revenue),on:r.is_on})));
