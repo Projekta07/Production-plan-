@@ -295,7 +295,7 @@ function fromDbZone(r){
 }
 async function dbSaveZone(z){ if(!sb||!z) return; const {error}=await sb.from('studio_zones').upsert(toDbZone(z)); if(error) toast('Not saved: '+error.message); }
 async function dbDeleteZone(id){ if(!sb) return; const {error}=await sb.from('studio_zones').delete().eq('id',id); if(error) toast('Not deleted: '+error.message); }
-async function dbSaveProject(p){ if(!sb) return; const {error}=await sb.from('studio_projects').upsert({id:p.id,name:p.name,prio:p.prio,status:p.status,revenue:p.revenue||0}); if(error) toast('Not saved: '+error.message); }
+async function dbSaveProject(p){ if(!sb) return; const {error}=await sb.from('studio_projects').upsert({id:p.id,name:p.name,prio:p.prio,status:p.status,revenue:p.revenue||0,currency:p.currency||'USD',payments:p.payments||[]}); if(error) toast('Not saved: '+error.message); }
 async function dbSaveRate(m){ if(!sb) return; const {error}=await sb.from('studio_team').update({rate:m.rate}).eq('id',m.id); if(error) toast('Not saved: '+error.message); }
 async function dbSavePotential(pp){ if(!sb) return; const {error}=await sb.from('studio_potentials').update({is_on:pp.on}).eq('id',pp.id); if(error) toast('Not saved: '+error.message); }
 
@@ -317,11 +317,17 @@ const DISC = {
   wd: {name:'Working drawings',short:'drawings', unit:'packages', unit1:'package', role:'Architect', roles:'Architects', color:'var(--wd)'},
 };
 let PROJECTS = [
-  {id:'tanger1', name:'Tanger 1',           prio:2, status:'confirmed', revenue:18800},
-  {id:'majed',   name:'Majed',              prio:1, status:'confirmed', revenue:24000},
-  {id:'vida',    name:'Vida',               prio:4, status:'confirmed', revenue:9500},
-  {id:'gunther', name:'Gunther restaurant', prio:3, status:'confirmed', revenue:6000},
+  {id:'tanger1', name:'Tanger 1',           prio:2, status:'confirmed', revenue:18800, currency:'USD', payments:[]},
+  {id:'majed',   name:'Majed',              prio:1, status:'confirmed', revenue:136800, currency:'AED', payments:[
+    {stage:'Design concept, Conceptual BOQ, Submission Package', pct:25, amount:34200, paid:true},
+    {stage:'3D Visualizations',                                  pct:35, amount:47880, paid:false},
+    {stage:'Detailed drawings',                                  pct:30, amount:41040, paid:false},
+    {stage:'Detailed final BOQ',                                 pct:10, amount:13680, paid:false},
+  ]},
+  {id:'vida',    name:'Vida',               prio:4, status:'confirmed', revenue:9500, currency:'USD', payments:[]},
+  {id:'gunther', name:'Gunther restaurant', prio:3, status:'confirmed', revenue:6000, currency:'USD', payments:[]},
 ];
+/* contract: Palm villa M109, 730 sqm, Mr. Majed, Dubai — total AED 136,800 (incl. special discount), issued 30/06/2026 */
 const STATUS = {
   approved:{lab:'Approved',    col:'var(--appr)',  ink:'var(--appr-t)'},
   revision:{lab:'Revision',    col:'var(--rev)',   ink:'var(--rev-t)'},
@@ -682,10 +688,11 @@ function projectCost(pid, Sx){
   return {scheduled, pausedNominal, total:scheduled+pausedNominal};
 }
 function projectFinance(pid, Sx){
-  const p = proj(pid), cost = projectCost(pid, Sx);
+  const p = proj(pid), cost = projectCost(pid, Sx), currency = p.currency||'USD';
+  const costNative = usdToNative(cost.total, currency);
   const revenue = p.revenue||0;
-  return {revenue, cost:cost.total, margin:revenue-cost.total,
-    coverage: revenue - cost.total, ok: revenue>=cost.total, breakdown:cost};
+  return {revenue, cost:costNative, costUSD:cost.total, currency, margin:revenue-costNative,
+    coverage: revenue - costNative, ok: revenue>=costNative, breakdown:cost};
 }
 /* скільки коштує конкретна зона: факт (якщо заплановано), інакше оцінка */
 function zoneCostEstimate(z, Sx){
@@ -698,7 +705,15 @@ function zoneCostEstimate(z, Sx){
   const eff = z.status==='revision' ? (z.revEffort||1) : z.effort;
   return eff * nominalRate(z.a);
 }
-function money(n){ return '$'+Math.round(n).toLocaleString('en-US') }
+function money(n, currency){
+  currency = currency || 'USD';
+  if(currency==='USD') return '$'+Math.round(n).toLocaleString('en-US');
+  return currency+' '+Math.round(n).toLocaleString('en-US');
+}
+/* AED — довгостроково фіксований курс до долара (peg), лише для зведення різновалютних сум */
+const FX = { AED: 3.6725 };
+function usdToNative(amountUSD, currency){ return (currency && currency!=='USD') ? amountUSD*(FX[currency]||1) : amountUSD; }
+function toUSD(amountNative, currency){ return (currency && currency!=='USD') ? amountNative/(FX[currency]||1) : amountNative; }
 
 /* ======================================================================
    ТАЙМЛАЙН
@@ -808,25 +823,38 @@ function viewProduction(){
 function financeCard(pid){
   const p = proj(pid);
   const fz = projectFinance(pid, S);
+  const cur = fz.currency;
   const months = monthlyCost(pid, S);
   const keys = Object.keys(months).sort();
   const people = [...new Set(S.items.filter(x=>x.p===pid && !x.outsource).map(x=>x.a))].filter(Boolean);
   const outsourced = Z.filter(z=>z.p===pid && z.outsource);
+  const pausedNative = usdToNative(fz.breakdown.pausedNominal, cur);
   return `<section class="card" style="margin-top:16px">
-    <div class="card-h"><h2>Project finance</h2><span class="hint">what remains to build vs. what the client still owes</span></div>
+    <div class="card-h"><h2>Project finance</h2><span class="hint">what remains to build vs. what the client still owes${cur!=='USD'?' · billed in '+cur:''}</span></div>
     <div class="card-b">
       <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
-        <div class="kpi"><div class="l">Contracted revenue</div><div class="v">${money(fz.revenue)}</div><div class="f">agreed with the client</div></div>
-        <div class="kpi"><div class="l">Cost to finish</div><div class="v">${money(fz.cost)}</div>
-          <div class="f">${fz.breakdown.pausedNominal? money(fz.breakdown.pausedNominal)+' of it paused/estimated':'fully scheduled'}</div></div>
-        <div class="kpi ${fz.ok?'':'warn'}"><div class="l">Projected margin</div><div class="v">${money(fz.margin)}</div>
+        <div class="kpi"><div class="l">Contracted revenue</div><div class="v">${money(fz.revenue,cur)}</div><div class="f">agreed with the client</div></div>
+        <div class="kpi"><div class="l">Cost to finish</div><div class="v">${money(fz.cost,cur)}</div>
+          <div class="f">${fz.breakdown.pausedNominal? money(pausedNative,cur)+' of it paused/estimated':'fully scheduled'}</div></div>
+        <div class="kpi ${fz.ok?'':'warn'}"><div class="l">Projected margin</div><div class="v">${money(fz.margin,cur)}</div>
           <div class="f">${fz.ok? 'revenue covers remaining cost' : 'remaining cost exceeds revenue'}</div></div>
         <div class="kpi"><div class="l">Outsourced</div><div class="v">${outsourced.length}</div>
           <div class="f">${outsourced.length? money(outsourced.reduce((n,z)=>n+z.outsource.cost,0))+' flat fees':'nothing outsourced'}</div></div>
       </div>
       <div class="banner ${fz.ok?'ok':'warn'}">${fz.ok
-        ? `Remaining income ${money(fz.coverage)} is enough to cover the ${money(fz.cost)} still needed to finish ${esc(p.name)}.`
-        : `Remaining cost ${money(fz.cost)} is ${money(-fz.coverage)} more than what's left of the ${money(fz.revenue)} contract — margin is negative.`}</div>
+        ? `Remaining income ${money(fz.coverage,cur)} is enough to cover the ${money(fz.cost,cur)} still needed to finish ${esc(p.name)}.`
+        : `Remaining cost ${money(fz.cost,cur)} is ${money(-fz.coverage,cur)} more than what's left of the ${money(fz.revenue,cur)} contract — margin is negative.`}</div>
+      ${cur!=='USD'? `<div class="muted" style="font-size:11.5px;margin-top:9px">Cost converted from team salaries (USD) at a fixed ${cur} peg of ${FX[cur]} — the monthly breakdown below stays in USD, since that's the currency the team is paid in.</div>`:''}
+
+      ${p.payments && p.payments.length? `<div style="margin-top:22px">
+        <div class="calc-sec-h" style="margin-bottom:2px">Financing schedule<span class="muted">${money(p.payments.reduce((n,x)=>n+x.amount,0),cur)} total</span></div>
+        ${p.payments.map((pm,i)=>`<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-2)">
+          <button data-pay-toggle="${p.id}|${i}" class="pill" style="${pm.paid?'background:var(--appr);color:var(--appr-t);border-color:transparent':''}">${pm.paid?'✓ Paid':'Mark paid'}</button>
+          <div style="flex:1;min-width:0"><div style="font-size:14px">${esc(pm.stage)}</div><div class="muted" style="font-size:12px">${pm.pct}% of contract</div></div>
+          <div class="money" style="font-size:15px">${money(pm.amount,cur)}</div>
+        </div>`).join('')}
+        <div class="muted" style="font-size:12px;margin-top:11px">${p.payments.filter(x=>x.paid).length} of ${p.payments.length} stages invoiced · ${money(p.payments.filter(x=>x.paid).reduce((n,x)=>n+x.amount,0),cur)} received so far.</div>
+      </div>`:''}
 
       ${keys.length? `<div style="margin-top:20px">
         <div class="fin-head"><div>Month</div>${people.map(id=>`<div>${person(id).name}</div>`).join('')}${people.length<4?Array.from({length:4-people.length},()=>'<div></div>').join(''):''}</div>
@@ -1126,8 +1154,9 @@ function viewFinance(){
   const Sx = on.length ? buildScenario() : S;
 
   const real = PROJECTS.filter(p=>p.status==='confirmed');
-  const totRevenue = real.reduce((n,p)=>n+(p.revenue||0),0);
-  const totCost = real.reduce((n,p)=>n+projectFinance(p.id, S).cost,0);
+  const mixedCurrency = real.some(p=>(p.currency||'USD')!=='USD');
+  const totRevenue = real.reduce((n,p)=>n+toUSD(p.revenue||0, p.currency||'USD'),0);
+  const totCost = real.reduce((n,p)=>{ const f=projectFinance(p.id,S); return n+toUSD(f.cost,f.currency); },0);
   const totMargin = totRevenue-totCost;
   const totOutsource = Z.filter(z=>z.outsource).reduce((n,z)=>n+z.outsource.cost,0);
   const overBudget = real.map(p=>projectFinance(p.id,S)).filter(f=>!f.ok);
@@ -1141,9 +1170,9 @@ function viewFinance(){
   <div class="head"><h1>Finance</h1></div>
 
   <div class="kpis">
-    <div class="kpi"><div class="l">Contracted revenue</div><div class="v">${money(totRevenue)}</div><div class="f">${real.length} confirmed projects</div></div>
+    <div class="kpi"><div class="l">Contracted revenue</div><div class="v">${money(totRevenue)}</div><div class="f">${real.length} confirmed projects${mixedCurrency?' · AED converted':''}</div></div>
     <div class="kpi"><div class="l">Cost to finish everything</div><div class="v">${money(totCost)}</div><div class="f">${money(totOutsource)} of it outsourced</div></div>
-    <div class="kpi ${totMargin<0?'warn':''}"><div class="l">Projected margin</div><div class="v">${money(totMargin)}</div><div class="f">across all confirmed work</div></div>
+    <div class="kpi ${totMargin<0?'warn':''}"><div class="l">Projected margin</div><div class="v">${money(totMargin)}</div><div class="f">${mixedCurrency?`≈ USD, AED @ ${FX.AED}`:'across all confirmed work'}</div></div>
     <div class="kpi ${overBudget.length?'warn':''}"><div class="l">Over budget</div><div class="v">${overBudget.length}</div>
       <div class="f">${overBudget.length? overBudget.map(f=>{const pj=real.find(p=>projectFinance(p.id,S)===f); return pj?pj.name:'';}).filter(Boolean).join(', ') : 'none'}</div></div>
     <div class="kpi"><div class="l">Studio utilisation</div><div class="v">${Math.round(busyReal/capReal*100)}%</div>
@@ -1158,10 +1187,11 @@ function viewFinance(){
           const f=projectFinance(p.id,S), pct=f.revenue? Math.min(100,Math.round(f.cost/f.revenue*100)):0;
           return `<div style="margin-bottom:18px">
             <div style="display:flex;justify-content:space-between;font-size:15px;margin-bottom:6px">
-              <span>${esc(p.name)}</span><span class="money">${money(f.cost)} / ${money(f.revenue)}</span></div>
+              <span>${esc(p.name)}${f.currency!=='USD'?` <span class="muted" style="font-size:11.5px">(${f.currency})</span>`:''}</span>
+              <span class="money">${money(f.cost,f.currency)} / ${money(f.revenue,f.currency)}</span></div>
             <div style="height:10px;border-radius:6px;background:var(--line-2);overflow:hidden">
               <div style="height:100%;width:${pct}%;background:${f.ok?'var(--appr)':'var(--pause)'}"></div></div>
-            <div class="muted" style="font-size:12px;margin-top:5px">margin ${money(f.margin)}</div>
+            <div class="muted" style="font-size:12px;margin-top:5px">margin ${money(f.margin,f.currency)}</div>
           </div>`;
         }).join('')}
       </div>
@@ -1572,6 +1602,15 @@ document.addEventListener('click', e=>{
       floors:[{name:'Ground Floor', rooms:1, eff:2, executor:null}], ext:null, outsourceExt:null, dwgInt:[{name:'Drawings', eff:5}], dwgExt:[]});
     render(); return;
   }
+  if(n=el('[data-pay-toggle]')){
+    const [pid, idxStr] = n.dataset.payToggle.split('|'), i=+idxStr;
+    const p = proj(pid);
+    if(!p.payments || !p.payments[i]) return;
+    p.payments[i].paid = !p.payments[i].paid;
+    dbSaveProject(p); render();
+    toast(`${p.payments[i].stage}: ${p.payments[i].paid?'marked paid':'marked unpaid'}`);
+    return;
+  }
   if(n=el('[data-team-rm]')){
     const id=n.dataset.teamRm;
     if(Z.some(z=>z.a===id)){ toast('Reassign their zones before removing'); return; }
@@ -1646,7 +1685,7 @@ async function boot(){
     ]);
     if(team.error||proj.error||zones.error||pot.error) throw (team.error||proj.error||zones.error||pot.error);
     TEAM.length=0; TEAM.push(...team.data.map(r=>({id:r.id,name:r.name,team:r.team,color:r.color,rate:Number(r.rate),type:r.type||'staff'})));
-    PROJECTS.length=0; PROJECTS.push(...proj.data.map(r=>({id:r.id,name:r.name,prio:r.prio,status:r.status,revenue:Number(r.revenue)})));
+    PROJECTS.length=0; PROJECTS.push(...proj.data.map(r=>({id:r.id,name:r.name,prio:r.prio,status:r.status,revenue:Number(r.revenue),currency:r.currency||'USD',payments:r.payments||[]})));
     Z.length=0; Z.push(...zones.data.map(fromDbZone));
     state.potentials.length=0; state.potentials.push(...pot.data.map(r=>({id:r.id,name:r.name,effort:Number(r.effort),team:r.team,revenue:Number(r.revenue),on:r.is_on})));
     seq = Z.reduce((n,z)=>{ const m=/^z(\d+)$/.exec(z.id); return m? Math.max(n,+m[1]) : n; }, 0);
