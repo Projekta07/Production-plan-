@@ -541,6 +541,7 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 
 const state = {
   tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
+  ganttDisc:'all', ganttOpen:{},
   sim:{name:'Tanger 2', effort:30, team:'viz', ran:true, pick:0},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
   potentials:[
@@ -924,6 +925,125 @@ function grid(){
 function bar(a,b,{cls='',bg='',text='',top=11,data='',title=''}={}){
   const p=pct(a,b); if(!p) return '';
   return `<div class="bar ${cls}" ${data} title="${esc(title||text)}" style="left:${p.left}%;width:calc(${p.width}% - 3px);top:${top}px;${bg?`background:${bg};`:''}">${text}</div>`;
+}
+
+/* ======================================================================
+   PRODUCTION PLAN — справжній Гант одного проєкту, той самий розклад (S),
+   що й усюди інде; місяці замість тижнів, бо проєкт триває довше за 10-тижневе вікно Studio Load
+   ====================================================================== */
+function spanOfZones(zones){
+  const sched = zones.map(z=>S.byId.get(z.id)).filter(it=>it && it.s);
+  if(!sched.length) return null;
+  const starts = sched.map(x=>D(x.s)), ends = sched.map(x=>D(x.e));
+  return {
+    s: starts.reduce((a,x)=>x<a?x:a, starts[0]),
+    e: ends.reduce((a,x)=>x>a?x:a, ends[0]),
+  };
+}
+function ganttRange(projectId, discFilter){
+  const zones = Z.filter(z=>z.p===projectId && (discFilter==='all'||z.d===discFilter));
+  const sp = spanOfZones(zones);
+  const start = sp ? new Date(Math.min(sp.s, TODAY)) : TODAY;
+  const end = sp ? sp.e : addDays(TODAY,30);
+  return {
+    start: new Date(start.getFullYear(), start.getMonth(), 1),
+    end:   new Date(end.getFullYear(), end.getMonth()+1, 0),
+  };
+}
+function ganttMonths(r){
+  const cols=[]; let m=new Date(r.start.getFullYear(), r.start.getMonth(), 1);
+  while(m<=r.end){ cols.push(new Date(m)); m=new Date(m.getFullYear(), m.getMonth()+1, 1); }
+  return cols;
+}
+function ganttPct(a,b,r){
+  const total=(r.end-r.start)/864e5+1;
+  const s=new Date(Math.max(D(a),r.start)), e=new Date(Math.min(D(b),r.end));
+  if(e<s) return null;
+  return {left:(s-r.start)/864e5/total*100, width:((e-s)/864e5+1)/total*100};
+}
+function ganttBar(span,r,{cls='',bg='',text='',top=9,title=''}={}){
+  if(!span) return '';
+  const p=ganttPct(iso(span.s),iso(span.e),r); if(!p) return '';
+  return `<div class="bar ${cls}" title="${esc(title||text)}" style="left:${p.left}%;width:calc(${p.width}% - 3px);top:${top}px;${bg?`background:${bg};`:''}">${text}</div>`;
+}
+function ganttGrid(r, months){
+  const t = ganttPct(iso(TODAY), iso(TODAY), r);
+  return `<div class="gl">${months.map(()=>'<i></i>').join('')}</div>${t?`<div class="today" style="left:${t.left}%"></div>`:''}`;
+}
+function ganttHead(months){
+  return `<div class="tl-head"><div></div><div class="tl-weeks">${months.map(m=>`<span>${m.toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</span>`).join('')}</div></div>`;
+}
+function barColorFor(team){ return team.length ? person(team[0].id).color : 'var(--ns)'; }
+
+function viewGanttPlan(){
+  const pr = proj(state.project);
+  const discFilter = state.ganttDisc;
+  const r = ganttRange(pr.id, discFilter);
+  const months = ganttMonths(r);
+  const projects = PROJECTS.filter(p=>Z.some(z=>z.p===p.id));
+  const discs = discFilter==='all' ? Object.keys(DISC).filter(d=>Z.some(z=>z.p===pr.id&&z.d===d)) : [discFilter];
+
+  const rows = [];
+  discs.forEach(d=>{
+    const dz = Z.filter(z=>z.p===pr.id && z.d===d);
+    if(!dz.length) return;
+    const effort = dz.reduce((n,z)=>n+z.effort,0);
+    rows.push({kind:'group', disc:d, label:DISC[d].name, effort, span:spanOfZones(dz)});
+    const floors = [...new Set(dz.map(z=>z.floor))].sort((a,b)=>floorOrder(a)-floorOrder(b));
+    floors.forEach(f=>{
+      const fz = dz.filter(z=>z.floor===f);
+      const fkey = `${pr.id}|${d}|${f}`;
+      const team = floorTeam(fz);
+      rows.push({kind:'floor', disc:d, floor:f, fkey, label:f, team, effort:fz.reduce((n,z)=>n+z.effort,0), span:spanOfZones(fz)});
+      if(state.ganttOpen[fkey]){
+        scopesOf(fz).forEach(g=>{
+          rows.push({kind:'scope', disc:d, floor:f, fkey, label:g.name, team:g.assignees.map(id=>({id})), effort:g.effort, span:spanOfZones(g.zones)});
+        });
+      }
+    });
+  });
+
+  return `
+  <div class="head">
+    <h1>${esc(pr.name)} · Production Plan</h1>
+    <div class="spacer"></div>
+    <div class="seg">
+      <button data-gantt-disc="all" aria-pressed="${discFilter==='all'}">All</button>
+      ${Object.entries(DISC).map(([k,v])=>`<button data-gantt-disc="${k}" aria-pressed="${discFilter===k}">${v.name}</button>`).join('')}
+    </div>
+    <select class="sel" id="ganttProjSel">${projects.map(p=>`<option value="${p.id}" ${p.id===pr.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+  </div>
+
+  <section class="card">
+    <div class="card-h"><h2>Task / Scope</h2><span class="hint">real dates from the team's schedule · click ▸ to reveal scopes</span></div>
+    <div class="card-b">
+      <div class="tlm-wrap"><div class="tl" style="--lab:240px;min-width:760px">
+        ${ganttHead(months)}
+        ${rows.length? rows.map(row=>{
+          if(row.kind==='group'){
+            return `<div class="tl-row" style="background:var(--line-2);border-bottom:1px solid var(--line)">
+              <div class="tl-lab"><b style="font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)">${esc(row.label)}</b>
+                <small>${row.effort}d${row.span?` · ${fmt(row.span.s)} – ${fmt(row.span.e)}`:' · not scheduled'}</small></div>
+              <div class="track">${ganttGrid(r,months)}${ganttBar(row.span,r,{cls:'dim',bg:'var(--ink-2)',text:row.effort+'d'})}</div></div>`;
+          }
+          if(row.kind==='floor'){
+            const open = !!state.ganttOpen[row.fkey];
+            return `<div class="tl-row"><div class="tl-lab" style="display:flex;align-items:center;gap:7px">
+                <button class="floor-chev ${open?'open':''}" data-gantt-toggle="${row.fkey}" aria-label="Expand ${esc(row.floor)}">▸</button>
+                <div style="min-width:0"><div style="display:flex;align-items:center;gap:7px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
+                  <small>${row.effort}d${row.span?` · ${fmt(row.span.s)} – ${fmt(row.span.e)}`:''}</small></div>
+              </div>
+              <div class="track">${ganttGrid(r,months)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d'})
+                : `<div class="muted" style="font-size:11px;padding:9px 0">not scheduled</div>`}</div></div>`;
+          }
+          return `<div class="tl-row child"><div class="tl-lab" style="padding-left:30px"><div style="display:flex;align-items:center;gap:7px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
+              <small>${row.effort}d${row.span?` · ${fmt(row.span.s)} – ${fmt(row.span.e)}`:''}</small></div>
+            <div class="track">${ganttGrid(r,months)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), cls:'sm', text:row.effort+'d'}) : ''}</div></div>`;
+        }).join('') : '<div class="muted" style="padding:20px 0">No work in this discipline yet.</div>'}
+      </div></div>
+    </div>
+  </section>
+  <p class="muted" style="font-size:11.5px;margin-top:12px">One project at a time for now — switch projects with the selector above. A combined view across every project can follow once this logic feels right.</p>`;
 }
 
 /* ======================================================================
@@ -1903,11 +2023,11 @@ function render(){
   const r=range();
   document.getElementById('range').innerHTML =
     `<button data-shift="-1" aria-label="Previous week">‹</button>${fmt(r.start)} — ${fmt(r.end)}<button data-shift="1" aria-label="Next week">›</button>`;
-  document.getElementById('tabs').innerHTML = [['production','Project production'],['load','Studio load'],['potential','Potential project'],['calendar','Resource calendar'],['finance','Finance'],['all','All projects']]
+  document.getElementById('tabs').innerHTML = [['production','Project calculator'],['gantt','Production plan'],['load','Studio load'],['potential','Potential project'],['calendar','Resource calendar'],['finance','Finance'],['all','All projects']]
     .map(([k,l])=>`<button role="tab" data-tab="${k}" aria-selected="${state.tab===k}">${l}</button>`).join('');
   document.getElementById('main').innerHTML =
     state.tab==='load' ? viewLoad() : state.tab==='potential' ? viewPotential() : state.tab==='calendar' ? viewCalendar()
-    : state.tab==='finance' ? viewFinance() : state.tab==='all' ? viewAllProjects() : viewProduction();
+    : state.tab==='finance' ? viewFinance() : state.tab==='all' ? viewAllProjects() : state.tab==='gantt' ? viewGanttPlan() : viewProduction();
 }
 
 /* ======================================================================
@@ -1932,6 +2052,8 @@ document.addEventListener('click', e=>{
   if(n=el('[data-person-load]')){ openLoadDetail(n.dataset.personLoad, null); return; }
   if(n=el('[data-open-zone]')){ openZone(n.dataset.openZone); return; }
   if(n=el('[data-zone]')){ openZone(n.dataset.zone); render(); openZone(n.dataset.zone); return; }
+  if(n=el('[data-gantt-toggle]')){ const k=n.dataset.ganttToggle; state.ganttOpen[k]=!state.ganttOpen[k]; render(); return; }
+  if(n=el('[data-gantt-disc]')){ state.ganttDisc=n.dataset.ganttDisc; render(); return; }
   if(n=el('[data-floor-toggle]')){ const k=n.dataset.floorToggle; state.openFloor[k]=!state.openFloor[k]; closeDrawer(); return; }
   if(n=el('[data-floor-open]')){ state.openFloor[n.dataset.floorOpen]=true; closeDrawer(); return; }
   if(n=el('[data-floor-team]')){ openFloorTeam(n.dataset.floorTeam); return; }
@@ -2108,7 +2230,7 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
-  if(t.id==='projSel'){ state.project=t.value; render(); return; }
+  if(t.id==='projSel' || t.id==='ganttProjSel'){ state.project=t.value; render(); return; }
   if(t.dataset.scopeReassign!==undefined){
     const [pid,disc,floor,name] = t.dataset.scopeReassign.split('|');
     const who = t.value || null;
