@@ -256,27 +256,26 @@ h1{font-size:34px;font-weight:500;letter-spacing:-.025em;margin:0}
 .effort-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:9px}
 .effort-chips .ec{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}
 .tlm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
-.gantt-compact .tl-row{min-height:44px}
-.gantt-compact .tl-lab{padding:7px 10px 7px 0;font-size:13px}
-.gantt-compact .tl-lab small{font-size:10.5px}
-.gantt-compact .track{min-height:44px}
-.gantt-compact .bar{height:22px;font-size:10.5px;padding:0 7px}
-.bar.two-line{height:30px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;line-height:1.3;gap:0}
-.bar.two-line .bt{font-size:10.5px;font-weight:600}
-.bar.two-line .bs{font-size:9px;opacity:.82;font-weight:400}
-.gantt-compact .floor-chev{width:18px;height:18px}
+.gantt-compact .tl-row{min-height:60px}
+.gantt-compact .tl-lab{padding:9px 12px 9px 0;font-size:14.5px;line-height:1.35}
+.gantt-compact .tl-lab small{font-size:12px;color:var(--muted)}
+.gantt-compact .track{min-height:60px}
+.gantt-compact .bar{height:30px;font-size:12px;padding:0 9px;font-weight:500}
+.bar.two-line{height:38px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;line-height:1.35;gap:1px}
+.bar.two-line .bt{font-size:12px;font-weight:600}
+.bar.two-line .bs{font-size:10.5px;opacity:.85;font-weight:400}
+.gantt-compact .floor-chev{width:22px;height:22px;font-size:13px}
 .gantt-row.child{background:var(--card)}
+.gantt-row+.gantt-row{border-top:1px solid var(--line-2)}
+.gantt-compact .tl-row:hover{background:var(--line-2)}
+.gantt-compact .tl-row.child:hover{background:var(--line-2)}
 .gantt-head .tl-weeks span{font-size:10.5px}
 .gl i.wk{background:var(--line-2)}
 .tl-months{display:flex}
 .tl-months span{font-size:10px;font-weight:600;color:var(--ink-2);letter-spacing:.02em;border-left:1px solid var(--line);padding:2px 0 2px 6px;overflow:hidden;white-space:nowrap}
 .tl-months span:first-child{border-left:0}
 .tl-weeks span.wk{color:var(--muted)}
-.gantt-summary-row{min-height:28px}
-.gantt-summary-row .tl-lab{padding:5px 10px 5px 16px;border-left:2px solid var(--line);margin-left:10px;font-size:11.5px;color:var(--ink-2)}
-.gantt-summary-row .tl-lab small{font-size:10px}
-.gantt-summary-row .bar{height:15px;font-size:9.5px;padding:0 6px;background:var(--line-2);color:var(--ink-2)}
-.gantt-summary-row .track{min-height:28px}
+
 table.tlm{border-collapse:collapse;width:100%;min-width:620px;font-size:13px}
 .tlm th,.tlm td{padding:9px 13px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line-2)}
 .tlm th:first-child,.tlm td:first-child{text-align:left;position:sticky;left:0;background:var(--card);z-index:2;box-shadow:2px 0 4px -2px rgba(0,0,0,.08)}
@@ -1013,11 +1012,12 @@ function ganttPct(a,b,r){
   if(e<s) return null;
   return {left:(s-r.start)/864e5/total*100, width:((e-s)/864e5+1)/total*100};
 }
-function ganttBar(span,r,{cls='',bg='',text='',sub='',top=7,title=''}={}){
+function ganttBar(span,r,{cls='',bg='',text='',sub='',top=7,title='',ip=false}={}){
   if(!span) return '';
   const p=ganttPct(iso(span.s),iso(span.e),r); if(!p) return '';
-  const inner = sub ? `<span class="bt">${esc(text)}</span><span class="bs">${esc(sub)}</span>` : esc(text);
-  return `<div class="bar sm ${sub?'two-line':''} ${cls}" title="${esc(title||(text+(sub?' · '+sub:'')))}" style="left:${p.left}%;width:calc(${p.width}% - 2px);top:${top}px;${bg?`background:${bg};`:''}">${inner}</div>`;
+  const dot = ip ? `<i style="width:6px;height:6px;border-radius:50%;background:var(--inprog-t);display:inline-block;margin-right:5px;flex:none"></i>` : '';
+  const inner = sub ? `<span class="bt" style="display:flex;align-items:center">${dot}${esc(text)}</span><span class="bs">${esc(sub)}</span>` : `${dot}${esc(text)}`;
+  return `<div class="bar sm ${sub?'two-line':''} ${cls}" title="${esc((ip?'In progress · ':'')+(title||text)+(sub?' · '+sub:''))}" style="left:${p.left}%;width:calc(${p.width}% - 2px);top:${top}px;${bg?`background:${bg};`:''}">${inner}</div>`;
 }
 function ganttGrid(r, cols){
   const t = ganttPct(iso(TODAY), iso(TODAY), r);
@@ -1125,12 +1125,6 @@ function ganttSection(projectId, {embedded=false}={}){
     const effort = dz.reduce((n,z)=>n+z.effort,0);
     rows.push({kind:'group', disc:d, label:DISC[d].name, effort, span:spanOfZones(dz)});
     const floors = [...new Set(dz.map(z=>z.floor))].sort((a,b)=>floorOrder(a)-floorOrder(b));
-    if(floors.length>1){
-      floors.forEach(f=>{
-        const fz = dz.filter(z=>z.floor===f);
-        rows.push({kind:'summary', disc:d, floor:f, label:f, effort:fz.reduce((n,z)=>n+z.effort,0), span:spanOfZones(fz)});
-      });
-    }
     floors.forEach(f=>{
       const fz = dz.filter(z=>z.floor===f);
       const fkey = `${pr.id}|${d}|${f}`;
@@ -1157,7 +1151,7 @@ function ganttSection(projectId, {embedded=false}={}){
       </div>
     </div>
     <div class="card-b" style="padding:0">
-      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:200px;min-width:${Math.max(700,cols.length*(zoom==='day'?26:zoom==='week'?56:84))}px">
+      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:230px;min-width:${Math.max(760,cols.length*(zoom==='day'?30:zoom==='week'?64:92))}px">
         ${ganttHead(cols)}
         ${rows.length? rows.map(row=>{
           if(row.kind==='group'){
@@ -1166,11 +1160,6 @@ function ganttSection(projectId, {embedded=false}={}){
                 <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:' · not scheduled'}</small></div>
               <div class="track">${ganttGrid(r,cols)}${ganttBar(row.span,r,{cls:'dim',bg:'var(--ink-2)',text:row.effort+'d',sub:row.span?`${fmt(row.span.s)} – ${fmt(row.span.e)}`:'',top:6})}</div></div>`;
           }
-          if(row.kind==='summary'){
-            return `<div class="tl-row gantt-row gantt-summary-row"><div class="tl-lab">
-                <div>${esc(row.label)}</div><small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-              <div class="track">${ganttGrid(r,cols)}${ganttBar(row.span,r,{text:row.effort+'d', top:6})}</div></div>`;
-          }
           if(row.kind==='floor'){
             const open = !!state.ganttOpen[row.fkey];
             return `<div class="tl-row gantt-row"><div class="tl-lab" style="display:flex;align-items:center;gap:6px">
@@ -1178,13 +1167,13 @@ function ganttSection(projectId, {embedded=false}={}){
                 <div style="min-width:0;overflow:hidden"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
                   <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
               </div>
-              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(inProgressTag(row.span)?'In progress · ':'')+(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
+              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), ip:inProgressTag(row.span), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
                 : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
           }
           return `<div class="tl-row gantt-row child" style="cursor:pointer" ${row.single?`data-resched="${row.zoneId}"`:`data-scope-open="${row.fkey}|${esc(row.label)}"`}>
             <div class="tl-lab" style="padding-left:26px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
               <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(inProgressTag(row.span)?'In progress · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), ip:inProgressTag(row.span), text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
         }).join('') : '<div class="muted" style="padding:20px 18px">No work in this discipline yet.</div>'}
       </div></div>
     </div>
@@ -1241,7 +1230,7 @@ function ganttSectionAll(){
         ${Object.entries(DISC).map(([k,v])=>`<button data-gantt-disc="${k}" aria-pressed="${discFilter===k}">${v.short}</button>`).join('')}</div>
     </div>
     <div class="card-b" style="padding:0">
-      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:200px;min-width:${Math.max(700,cols.length*(zoom==='day'?26:zoom==='week'?56:84))}px">
+      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:230px;min-width:${Math.max(760,cols.length*(zoom==='day'?30:zoom==='week'?64:92))}px">
         ${ganttHead(cols)}
         ${rows.length? rows.map(row=>{
           if(row.kind==='project'){
@@ -1266,13 +1255,13 @@ function ganttSectionAll(){
                 <button class="floor-chev ${open?'open':''}" data-gantt-toggle="${row.fkey}" aria-label="Expand ${esc(row.floor)}">▸</button>
                 <div style="min-width:0;overflow:hidden"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
                   <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div></div>
-              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(inProgressTag(row.span)?'In progress · ':'')+(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
+              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), ip:inProgressTag(row.span), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
                 : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
           }
           return `<div class="tl-row gantt-row child" style="cursor:pointer" ${row.single?`data-resched="${row.zoneId}"`:`data-scope-open="${row.fkey}|${esc(row.label)}"`}>
             <div class="tl-lab" style="padding-left:40px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
               <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(inProgressTag(row.span)?'In progress · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), ip:inProgressTag(row.span), text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
         }).join('') : '<div class="muted" style="padding:20px 18px">No confirmed work yet.</div>'}
       </div></div>
     </div>
