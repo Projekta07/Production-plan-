@@ -255,11 +255,14 @@ h1{font-size:34px;font-weight:500;letter-spacing:-.025em;margin:0}
 .effort-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:9px}
 .effort-chips .ec{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}
 .tlm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
-.gantt-compact .tl-row{min-height:38px}
+.gantt-compact .tl-row{min-height:44px}
 .gantt-compact .tl-lab{padding:7px 10px 7px 0;font-size:13px}
 .gantt-compact .tl-lab small{font-size:10.5px}
-.gantt-compact .track{min-height:38px}
+.gantt-compact .track{min-height:44px}
 .gantt-compact .bar{height:22px;font-size:10.5px;padding:0 7px}
+.bar.two-line{height:30px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;line-height:1.3;gap:0}
+.bar.two-line .bt{font-size:10.5px;font-weight:600}
+.bar.two-line .bs{font-size:9px;opacity:.82;font-weight:400}
 .gantt-compact .floor-chev{width:18px;height:18px}
 .gantt-row.child{background:var(--card)}
 .gantt-head .tl-weeks span{font-size:10.5px}
@@ -560,7 +563,7 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 
 const state = {
   tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
-  ganttDisc:'all', ganttOpen:{}, ganttZoom:'week',
+  ganttDisc:'all', ganttOpen:{}, ganttZoom:'week', quickSetupOpen:false,
   sim:{name:'Tanger 2', effort:30, team:'viz', ran:true, pick:0},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
   potentials:[
@@ -989,10 +992,11 @@ function ganttPct(a,b,r){
   if(e<s) return null;
   return {left:(s-r.start)/864e5/total*100, width:((e-s)/864e5+1)/total*100};
 }
-function ganttBar(span,r,{cls='',bg='',text='',top=7,title=''}={}){
+function ganttBar(span,r,{cls='',bg='',text='',sub='',top=7,title=''}={}){
   if(!span) return '';
   const p=ganttPct(iso(span.s),iso(span.e),r); if(!p) return '';
-  return `<div class="bar sm ${cls}" title="${esc(title||text)}" style="left:${p.left}%;width:calc(${p.width}% - 2px);top:${top}px;${bg?`background:${bg};`:''}">${text}</div>`;
+  const inner = sub ? `<span class="bt">${esc(text)}</span><span class="bs">${esc(sub)}</span>` : esc(text);
+  return `<div class="bar sm ${sub?'two-line':''} ${cls}" title="${esc(title||(text+(sub?' · '+sub:'')))}" style="left:${p.left}%;width:calc(${p.width}% - 2px);top:${top}px;${bg?`background:${bg};`:''}">${inner}</div>`;
 }
 function ganttGrid(r, cols){
   const t = ganttPct(iso(TODAY), iso(TODAY), r);
@@ -1104,7 +1108,7 @@ function ganttSection(projectId, {embedded=false}={}){
             return `<div class="tl-row gantt-row" style="background:var(--line-2);border-bottom:1px solid var(--line)">
               <div class="tl-lab"><b style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)">${esc(row.label)}</b>
                 <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:' · not scheduled'}</small></div>
-              <div class="track">${ganttGrid(r,cols)}${ganttBar(row.span,r,{cls:'dim',bg:'var(--ink-2)',text:row.effort+'d'})}</div></div>`;
+              <div class="track">${ganttGrid(r,cols)}${ganttBar(row.span,r,{cls:'dim',bg:'var(--ink-2)',text:row.effort+'d',sub:row.span?`${fmt(row.span.s)} – ${fmt(row.span.e)}`:'',top:6})}</div></div>`;
           }
           if(row.kind==='summary'){
             return `<div class="tl-row gantt-row gantt-summary-row"><div class="tl-lab">
@@ -1118,12 +1122,12 @@ function ganttSection(projectId, {embedded=false}={}){
                 <div style="min-width:0;overflow:hidden"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
                   <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
               </div>
-              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d'})
+              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
                 : `<div class="muted" style="font-size:10.5px;padding:7px 0">not scheduled</div>`}</div></div>`;
           }
           return `<div class="tl-row gantt-row child"><div class="tl-lab" style="padding-left:26px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
               <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:row.effort+'d'}) : ''}</div></div>`;
+            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : ''}</div></div>`;
         }).join('') : '<div class="muted" style="padding:20px 18px">No work in this discipline yet.</div>'}
       </div></div>
     </div>
@@ -1147,6 +1151,65 @@ function viewGanttPlan(){
 /* ======================================================================
    VIEW 1 · PROJECT PRODUCTION
    ====================================================================== */
+/* ---------- Quick setup: коротка форма "кімнат на поверх × днів на кімнату", без 35 попапів ---------- */
+function quickSetupPanel(pr, disc){
+  const dc = DISC[disc];
+  const zones = Z.filter(z=>z.p===pr.id && z.d===disc);
+  const floors = [...new Set(zones.map(z=>z.floor))].sort((a,b)=>floorOrder(a)-floorOrder(b));
+  const open = !!state.quickSetupOpen;
+  return `<section class="card" style="margin-bottom:16px">
+    <div class="card-h" data-quicksetup-toggle style="cursor:pointer">
+      <h2>Quick setup</h2><span class="hint">rooms per floor and days per room — no need to open each one</span>
+      <span class="floor-chev ${open?'open':''}" style="margin-left:auto">▸</span>
+    </div>
+    ${open? `<div class="card-b">
+      ${floors.map((f,i)=>{
+        const fz = zones.filter(z=>z.floor===f);
+        const pending = fz.filter(z=>z.status==='pending');
+        const commonEffort = pending.length? pending[0].effort : (fz[0]?fz[0].effort:2);
+        return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2)">
+          <div style="flex:1;min-width:120px;font-size:13.5px">${esc(f)}<div class="muted" style="font-size:11px">${fz.length} ${dc.unit} now${fz.length>pending.length?` · ${fz.length-pending.length} with real progress`:''}</div></div>
+          <label class="muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px">Rooms<input id="qsRooms${i}" type="number" min="0" value="${fz.length}" style="width:52px;border:1px solid var(--line);background:var(--line-2);border-radius:7px;padding:5px 7px"></label>
+          <label class="muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px">Days/room<input id="qsDays${i}" type="number" min="0.5" step="0.5" value="${commonEffort}" style="width:52px;border:1px solid var(--line);background:var(--line-2);border-radius:7px;padding:5px 7px"></label>
+          <button class="pill" data-qs-apply="${i}|${pr.id}|${disc}|${esc(f)}">Update</button>
+        </div>`;
+      }).join('') || `<div class="muted" style="padding:6px 0 14px">No floors yet — add the first one below.</div>`}
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px">
+        <input id="qsNewFloor" placeholder="New floor name" style="flex:1;min-width:140px;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px;font-size:13px">
+        <input id="qsNewRooms" type="number" min="1" value="1" placeholder="Rooms" style="width:72px;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px">
+        <input id="qsNewDays" type="number" min="0.5" step="0.5" value="2" placeholder="Days" style="width:72px;border:1px solid var(--line);background:var(--line-2);border-radius:9px;padding:8px 10px">
+        <button class="btn" data-qs-addfloor="${pr.id}|${disc}">+ Add floor</button>
+      </div>
+    </div>` : ''}
+  </section>`;
+}
+function applyQuickSetup(pid, disc, floor, targetRooms, targetDays){
+  const fz = Z.filter(z=>z.p===pid && z.d===disc && z.floor===floor).sort((a,b)=>a.n-b.n);
+  const pending = fz.filter(z=>z.status==='pending');
+  const nonPending = fz.length - pending.length;
+  if(targetRooms < nonPending){ toast(`${floor} already has ${nonPending} ${DISC[disc].unit} with real progress — can't go below that`); targetRooms = nonPending; }
+  pending.forEach(z=>{ z.effort=targetDays; dbSaveZone(z); });
+  const diff = targetRooms - fz.length;
+  if(diff>0){
+    const startN = Math.max(0,...fz.map(z=>z.n))+1;
+    const before = Z.length;
+    for(let k=0;k<diff;k++){
+      zone({p:pid, d:disc, floor, n:startN+k, name: disc==='viz'?'Room '+String(startN+k).padStart(2,'0'):'Package '+(startN+k),
+        effort:targetDays, status:'pending', a:null});
+    }
+    Z.slice(before).forEach(dbSaveZone);
+  } else if(diff<0){
+    let toRemove = -diff;
+    const removable = pending.slice().sort((a,b)=>b.n-a.n);
+    const ids = new Set();
+    for(const z of removable){ if(toRemove<=0) break; ids.add(z.id); toRemove--; }
+    ids.forEach(id=>dbDeleteZone(id));
+    Z = Z.filter(z=>!ids.has(z.id));
+  }
+  S=build(); render();
+  toast(`${floor}: ${targetRooms} ${DISC[disc].unit} · ${targetDays}d each`);
+}
+
 function viewProduction(){
   const pr = proj(state.project), dc = DISC[state.disc];
   const zones = Z.filter(z=>z.p===pr.id && z.d===state.disc);
@@ -1164,6 +1227,14 @@ function viewProduction(){
     <div class="seg">${Object.entries(DISC).map(([k,v])=>`<button data-disc="${k}" aria-pressed="${state.disc===k}">${v.short==='3D'?'3D':'Drawings'}</button>`).join('')}</div>
     <select class="sel" id="projSel">${projects.map(p=>`<option value="${p.id}" ${p.id===pr.id?'selected':''}>${esc(p.name)}${p.status!=='confirmed'?' (potential)':''}</option>`).join('')}</select>
   </div>
+  <div style="display:flex;flex-wrap:wrap;margin:-8px 0 16px;gap:10px;align-items:center">
+    <span class="pill" style="gap:8px">
+      <span class="muted" style="font-size:12px">Project start</span>
+      <input type="date" id="projStart" value="${(()=>{ const all=Z.filter(z=>z.p===pr.id); return all.length? all.reduce((a,z)=>z.earliest<a?z.earliest:a, all[0].earliest) : iso(TODAY); })()}"
+        style="border:0;background:transparent;font:inherit;color:inherit;padding:0;cursor:pointer">
+    </span>
+    <span class="muted" style="font-size:11.5px">sets the earliest date for every zone in this project at once · edit a single room's date from its own card</span>
+  </div>
   ${pr.status!=='confirmed'? `<p class="muted" style="font-size:12.5px;margin:-10px 0 18px">Rooms and drawings below are planned but don't occupy anyone's real calendar until you confirm this project.</p>`:''}
 
   <div class="kpis">
@@ -1180,6 +1251,8 @@ function viewProduction(){
       })()}</div></div>
     <div class="kpi"><div class="l">Forecast finish</div><div class="v">${fin?fmt(D(fin)):(b.left?'—':'Done')}</div><div class="f">${fin? 'from the team calendar' : b.left? 'no one assigned':'all approved'}</div></div>
   </div>
+
+  ${quickSetupPanel(pr, state.disc)}
 
   <div class="grid2">
     <section class="card">
@@ -2047,6 +2120,10 @@ function openZone(id){
     ${z.status==='revision'?`<div class="field"><div class="fl">Revision effort</div>
       <div class="stepper"><button data-rev="-0.5">−</button><span>${z.revEffort} d</span><button data-rev="0.5">+</button></div></div>`:''}
 
+    <div class="field"><div class="fl">Not before (earliest start)</div>
+      <input type="date" data-earliest value="${z.earliest}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
+      <div class="muted" style="font-size:12px;margin-top:7px">${s&&s.s? `Currently scheduled ${fmt(D(s.s))} – ${fmt(D(s.e))}. Moving this later pushes anything waiting on it too.` : 'Moves when the team actually gets to it — everything downstream follows automatically.'}</div></div>
+
     <div class="field"><div class="fl">${dc.role}</div>
       <select data-assign><option value="">Not assigned</option>
       ${TEAM.filter(m=>m.team===z.d).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${m.name}${m.type==='freelance'?' (outsource)':''}</option>`).join('')}</select></div>
@@ -2151,6 +2228,28 @@ document.addEventListener('click', e=>{
   if(n=el('[data-person-load]')){ openLoadDetail(n.dataset.personLoad, null); return; }
   if(n=el('[data-open-zone]')){ openZone(n.dataset.openZone); return; }
   if(n=el('[data-zone]')){ openZone(n.dataset.zone); render(); openZone(n.dataset.zone); return; }
+  if(n=el('[data-quicksetup-toggle]')){ state.quickSetupOpen=!state.quickSetupOpen; render(); return; }
+  if(n=el('[data-qs-apply]')){
+    const [i,pid,disc,floor] = n.dataset.qsApply.split('|');
+    const rooms = Math.max(0, Math.round(+document.getElementById('qsRooms'+i).value||0));
+    const days = Math.max(0.5, +document.getElementById('qsDays'+i).value||0.5);
+    applyQuickSetup(pid, disc, floor, rooms, days);
+    return;
+  }
+  if(n=el('[data-qs-addfloor]')){
+    const [pid,disc] = n.dataset.qsAddfloor.split('|');
+    const name = document.getElementById('qsNewFloor').value.trim();
+    if(!name){ toast('Enter a floor name'); return; }
+    const rooms = Math.max(1, Math.round(+document.getElementById('qsNewRooms').value||1));
+    const days = Math.max(0.5, +document.getElementById('qsNewDays').value||2);
+    const before = Z.length;
+    for(let k=1;k<=rooms;k++){
+      zone({p:pid, d:disc, floor:name, n:k, name: disc==='viz'?'Room '+String(k).padStart(2,'0'):'Package '+k, effort:days, status:'pending', a:null});
+    }
+    Z.slice(before).forEach(dbSaveZone);
+    S=build(); render();
+    toast(`${name}: ${rooms} ${DISC[disc].unit} added`); return;
+  }
   if(n=el('[data-gantt-toggle]')){ const k=n.dataset.ganttToggle; state.ganttOpen[k]=!state.ganttOpen[k]; render(); return; }
   if(n=el('[data-gantt-disc]')){ state.ganttDisc=n.dataset.ganttDisc; render(); return; }
   if(n=el('[data-gantt-zoom]')){ state.ganttZoom=n.dataset.ganttZoom; render(); return; }
@@ -2331,6 +2430,14 @@ document.addEventListener('click', e=>{
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
   if(t.id==='projSel' || t.id==='ganttProjSel'){ state.project=t.value; render(); return; }
+  if(t.id==='projStart'){
+    const newDate = t.value; if(!newDate) return;
+    const p = proj(state.project);
+    const zs = Z.filter(z=>z.p===p.id);
+    zs.forEach(z=>{ z.earliest=newDate; dbSaveZone(z); });
+    S=build(); render();
+    toast(`${p.name}: nothing starts before ${fmt(D(newDate))}`); return;
+  }
   if(t.dataset.scopeReassign!==undefined){
     const [pid,disc,floor,name] = t.dataset.scopeReassign.split('|');
     const who = t.value || null;
@@ -2342,6 +2449,7 @@ document.addEventListener('change', e=>{
   }
   if(z && t.dataset.assign!==undefined){ z.a=t.value||null; if(!z.a) z.outsource=null; else if(isFreelance(z.a) && !z.outsource) z.outsource={cost:0}; changed(`${z.name}: ${z.a?person(z.a).name:'not assigned'}`); return; }
   if(z && t.dataset.reason!==undefined){ z.reason=t.value; changed(`${z.name}: ${z.reason}`); return; }
+  if(z && t.dataset.earliest!==undefined){ if(!t.value) return; z.earliest=t.value; changed(`${z.name}: nothing before ${fmt(D(z.earliest))}`); return; }
   if(z && t.dataset.outfee!==undefined){ if(!z.outsource) z.outsource={cost:0}; z.outsource.cost=Math.max(0,+t.value||0); changed(`${z.name}: outsourced · ${money(z.outsource.cost)}`); return; }
   if(t.dataset.teamName!==undefined){ const m=person(t.dataset.teamName); m.name=t.value.trim()||m.name; dbSaveTeam(m); render(); return; }
   if(t.dataset.teamRole!==undefined){ const m=person(t.dataset.teamRole); m.team=t.value; dbSaveTeam(m); S=build(); render(); return; }
