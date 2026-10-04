@@ -1083,7 +1083,8 @@ function ganttSection(projectId, {embedded=false}={}){
       rows.push({kind:'floor', disc:d, floor:f, fkey, label:f, team, effort:fz.reduce((n,z)=>n+z.effort,0), span:spanOfZones(fz)});
       if(state.ganttOpen[fkey]){
         scopesOf(fz).forEach(g=>{
-          rows.push({kind:'scope', disc:d, floor:f, fkey, label:g.name, team:g.assignees.map(id=>({id})), effort:g.effort, span:spanOfZones(g.zones)});
+          rows.push({kind:'scope', disc:d, floor:f, fkey, label:g.name, team:g.assignees.map(id=>({id})), effort:g.effort, span:spanOfZones(g.zones),
+            single:g.single, zoneId:g.single?g.zones[0].id:null});
         });
       }
     });
@@ -1125,7 +1126,8 @@ function ganttSection(projectId, {embedded=false}={}){
               <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
                 : `<div class="muted" style="font-size:10.5px;padding:7px 0">not scheduled</div>`}</div></div>`;
           }
-          return `<div class="tl-row gantt-row child"><div class="tl-lab" style="padding-left:26px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
+          return `<div class="tl-row gantt-row child" style="cursor:pointer" ${row.single?`data-resched="${row.zoneId}"`:`data-scope-open="${row.fkey}|${esc(row.label)}"`}>
+            <div class="tl-lab" style="padding-left:26px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
               <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
             <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : ''}</div></div>`;
         }).join('') : '<div class="muted" style="padding:20px 18px">No work in this discipline yet.</div>'}
@@ -1223,7 +1225,7 @@ function roomsTable(pr, disc, zones, floors){
           ${fz.map(z=>{
             const it = S.byId.get(z.id);
             return `<tr>
-              <td style="text-align:left">${esc(z.name)}${z.scope?`<div class="muted" style="font-size:10.5px">${esc(z.scope)}</div>`:''}</td>
+              <td style="text-align:left"><input data-tbl-rename="${z.id}" value="${esc(z.name)}" style="width:100%;min-width:90px;border:0;background:none;font:inherit;font-size:13px;color:var(--ink);padding:2px 0">${z.scope?`<div class="muted" style="font-size:10.5px">${esc(z.scope)}</div>`:''}</td>
               <td class="num"><input type="number" min="0.5" step="0.5" value="${z.effort}" data-tbl-effort="${z.id}" style="width:54px;text-align:right;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px"></td>
               <td style="text-align:left"><select data-tbl-assign="${z.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px;max-width:110px">
                 <option value="">—</option>${TEAM.filter(m=>m.team===disc).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></td>
@@ -2131,13 +2133,33 @@ function openAddScope(fkey){
     <div style="display:flex;gap:10px;margin-top:20px"><button class="pill" data-close>Cancel</button><button class="btn" data-save-scope="${fkey}">Save</button></div>`);
 }
 
+/* ---------- Reschedule: фокусована картка для зсуву дати прямо з Ганта — та сама зона, ті самі залежності ---------- */
+function openRescheduleDrawer(id){
+  const z = Z.find(x=>x.id===id); if(!z) return;
+  const it = S.byId.get(id), dc = DISC[z.d];
+  drawer(`<button class="x" data-close aria-label="Close">×</button>
+    <div class="muted" style="font-size:13px">${esc(proj(z.p).name)} · ${dc.name} · ${esc(z.floor)}</div>
+    <h3>Reschedule — ${esc(z.name)}</h3>
+    <div class="field"><div class="fl">Current dates</div>
+      <div style="font-size:14px">${it&&it.s? `${fmt(D(it.s))} – ${fmt(D(it.e))} · ${active(z)||0}d left` : (z.status==='approved'?'Done — nothing scheduled':'Not scheduled yet')}</div></div>
+    <div class="field"><div class="fl">New start date (not before)</div>
+      <input type="date" id="reschedStart" value="${z.earliest}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px"></div>
+    <div class="field"><div class="fl">Duration, days</div>
+      <input type="number" id="reschedDur" min="0.5" step="0.5" value="${z.effort}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px"></div>
+    <p class="muted" style="font-size:12px;margin-top:10px">Anything waiting on this stage shifts automatically once you apply — there's no separate mode that leaves dependents behind.</p>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="pill" data-close>Cancel</button>
+      <button class="btn" data-resched-apply="${id}">Apply changes</button>
+    </div>`);
+}
+
 function openZone(id){
   const z = Z.find(x=>x.id===id); if(!z) return;
   state.selZone=id;
   const s = S.byId.get(id), dc=DISC[z.d];
   drawer(`<button class="x" data-close aria-label="Close">×</button>
     <div class="muted" style="font-size:13px">${esc(proj(z.p).name)} · ${dc.name} · ${esc(z.floor)}</div>
-    <h3>${esc(z.name)}</h3>
+    <input data-rename value="${esc(z.name)}" style="width:100%;border:0;border-bottom:1px solid transparent;background:none;font:inherit;font-size:21px;font-weight:500;color:var(--ink);margin:4px 0 2px;padding:0 0 2px" onfocus="this.style.borderBottomColor='var(--line)'" onblur="this.style.borderBottomColor='transparent'">
 
     <div class="field"><div class="fl">Status</div>
       <div class="stbtns">${Object.entries(STATUS).map(([k,v])=>`<button data-set-status="${k}" aria-pressed="${z.status===k}"
@@ -2289,6 +2311,17 @@ document.addEventListener('click', e=>{
     Z.slice(before).forEach(dbSaveZone);
     S=build(); render();
     toast(`${name}: ${rooms} ${DISC[disc].unit} added`); return;
+  }
+  if(n=el('[data-resched]')){ openRescheduleDrawer(n.dataset.resched); return; }
+  if(n=el('[data-resched-apply]')){
+    const id = n.dataset.reschedApply, zz = Z.find(x=>x.id===id); if(!zz) return;
+    const newStart = document.getElementById('reschedStart').value;
+    if(!newStart){ toast('Pick a start date'); return; }
+    const newDur = Math.max(0.5, Math.round((+document.getElementById('reschedDur').value||0.5)*2)/2);
+    zz.earliest = newStart; zz.effort = newDur;
+    dbSaveZone(zz); S=build(); closeDrawer(); render();
+    toast(`${zz.name}: not before ${fmt(D(zz.earliest))} · ${zz.effort}d`);
+    return;
   }
   if(n=el('[data-gantt-toggle]')){ const k=n.dataset.ganttToggle; state.ganttOpen[k]=!state.ganttOpen[k]; render(); return; }
   if(n=el('[data-gantt-disc]')){ state.ganttDisc=n.dataset.ganttDisc; render(); return; }
@@ -2470,6 +2503,11 @@ document.addEventListener('click', e=>{
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
   if(t.id==='projSel' || t.id==='ganttProjSel'){ state.project=t.value; render(); return; }
+  if(t.dataset.tblRename!==undefined){
+    const zz=Z.find(x=>x.id===t.dataset.tblRename); if(!zz) return;
+    const newName=t.value.trim(); if(!newName){ t.value=zz.name; return; }
+    zz.name=newName; dbSaveZone(zz); render(); return;
+  }
   if(t.dataset.tblEffort!==undefined){
     const zz=Z.find(x=>x.id===t.dataset.tblEffort); if(!zz) return;
     zz.effort=Math.max(0.5, Math.round((+t.value||0.5)*2)/2); dbSaveZone(zz); S=build(); render(); return;
@@ -2502,6 +2540,7 @@ document.addEventListener('change', e=>{
     toast(`${name} → ${who?person(who).name:'not assigned'} · ${g.zones.length} ${DISC[disc].unit}`); return;
   }
   if(z && t.dataset.assign!==undefined){ z.a=t.value||null; if(!z.a) z.outsource=null; else if(isFreelance(z.a) && !z.outsource) z.outsource={cost:0}; changed(`${z.name}: ${z.a?person(z.a).name:'not assigned'}`); return; }
+  if(z && t.dataset.rename!==undefined){ const newName=t.value.trim(); if(!newName){ t.value=z.name; return; } z.name=newName; changed(`Renamed to ${z.name}`); return; }
   if(z && t.dataset.reason!==undefined){ z.reason=t.value; changed(`${z.name}: ${z.reason}`); return; }
   if(z && t.dataset.earliest!==undefined){ if(!t.value) return; z.earliest=t.value; changed(`${z.name}: nothing before ${fmt(D(z.earliest))}`); return; }
   if(z && t.dataset.outfee!==undefined){ if(!z.outsource) z.outsource={cost:0}; z.outsource.cost=Math.max(0,+t.value||0); changed(`${z.name}: outsourced · ${money(z.outsource.cost)}`); return; }
