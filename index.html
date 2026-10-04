@@ -350,7 +350,7 @@ function toDbZone(z){
   return {
     id:z.id, project_id:z.p, discipline:z.d, floor:z.floor??null, n:z.n, name:z.name,
     effort:z.effort, rev_effort:z.revEffort??1, status:z.status, assignee_id:z.a??null,
-    earliest:z.earliest, reason:z.reason??null, scope:z.scope??null, manual_order:z.manualOrder??null,
+    earliest:z.earliest, reason:z.reason??null, scope:z.scope??null, manual_order:z.manualOrder??null, urgent:z.urgent??false,
     v1_delivered: z.v1Delivered??null, v1_start: z.v1Start??null, revision_note: z.revisionNote??null,
     outsource_cost: z.outsource? z.outsource.cost : null,
     after_project_id: z.after? z.after.p : null,
@@ -363,7 +363,7 @@ function fromDbZone(r){
   return {
     id:r.id, p:r.project_id, d:r.discipline, floor:r.floor, n:r.n, name:r.name,
     effort:Number(r.effort), revEffort:Number(r.rev_effort), status:r.status, a:r.assignee_id,
-    earliest:r.earliest, reason:r.reason, scope:r.scope??undefined, manualOrder:r.manual_order??undefined,
+    earliest:r.earliest, reason:r.reason, scope:r.scope??undefined, manualOrder:r.manual_order??undefined, urgent:r.urgent??false,
     v1Delivered:r.v1_delivered??undefined, v1Start:r.v1_start??undefined, revisionNote:r.revision_note??undefined,
     outsource: r.outsource_cost!=null? {cost:Number(r.outsource_cost)} : undefined,
     after: r.after_project_id? {p:r.after_project_id, floor:r.after_floor, lag:r.after_lag} : undefined,
@@ -727,7 +727,8 @@ function build(extra=[]){
         // воно просто не "готове" сьогодні, якщо від дня лишився недостатній залишок; коротші за день беруть лише свою частку
         const c = items.filter(x=>x.a===m.id && ready(x,day) && (x.rem<1 || capLeft>=1-1e-9));
         if(!c.length) break;
-        c.sort((a,b)=>(proj(a.p).prio-proj(b.p).prio) || ((a.manualOrder??999999)-(b.manualOrder??999999)) || (floorOrder(a.floor)-floorOrder(b.floor)) || (a.n-b.n));
+        // urgent — перестрибує ВЕСЬ пріоритет проєктів для цієї людини, не лише порядок усередині свого проєкту
+        c.sort((a,b)=>((a.urgent?0:1)-(b.urgent?0:1)) || (proj(a.p).prio-proj(b.p).prio) || ((a.manualOrder??999999)-(b.manualOrder??999999)) || (floorOrder(a.floor)-floorOrder(b.floor)) || (a.n-b.n));
         const it = c[0];
         const take = it.rem>=1 ? Math.min(capLeft,1) : Math.min(capLeft, it.rem);
         it.rem -= take; capLeft -= take;
@@ -2840,6 +2841,21 @@ function openZone(id){
     <div class="field"><div class="fl" style="font-size:13.5px;font-weight:500;color:var(--ink);margin-bottom:12px">Schedule</div>
 
       ${(()=>{
+        // якщо реально заплановано набагато пізніше за "не раніше" — пояснюємо чергу, а не мовчимо
+        if(!z.a || !s || !s.s) return '';
+        const gap = Math.round((D(s.s) - D(z.earliest)) / 86400000);
+        if(gap < 20) return '';
+        return `<div style="background:var(--pause-t);border-radius:11px;padding:10px 13px;margin-bottom:10px;font-size:12px">
+          Queued behind other higher-priority projects for ${esc(person(z.a).name)} — that's why it lands ${gap} days after "not before". ${z.urgent?'Already marked urgent.':'Mark it urgent below to jump ahead of other projects for this person.'}
+        </div>`;
+      })()}
+      <div class="field" style="margin:0 0 12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <input type="checkbox" data-urgent ${z.urgent?'checked':''} style="width:16px;height:16px">
+        <span>Urgent — schedule before other projects for this person</span></label>
+        <div class="muted" style="font-size:11px;margin-top:3px;margin-left:24px">Jumps ${z.a?esc(person(z.a).name)+"'s":'the'} whole queue, not just this project's own priority.</div>
+      </div>
+
+      ${(()=>{
         const v1Live = z.status==='pending' || z.status==='inprogress'; // перша версія — це й є поточна активна робота
         const v1Badge = z.status==='approved'||z.status==='revision' ? {lab:'Completed',col:'var(--appr)',ink:'var(--appr-t)'}
           : z.status==='inprogress' ? {lab:'In progress',col:'var(--inprog)',ink:'var(--inprog-t)'}
@@ -3391,6 +3407,7 @@ document.addEventListener('change', e=>{
   if(z && t.dataset.rename!==undefined){ const newName=t.value.trim(); if(!newName){ t.value=z.name; return; } z.name=newName; changed(`Renamed to ${z.name}`); return; }
   if(z && t.dataset.reason!==undefined){ z.reason=t.value; changed(`${z.name}: ${z.reason}`); return; }
   if(z && t.dataset.earliest!==undefined){ if(!t.value) return; z.earliest=t.value; changed(`${z.name}: nothing before ${fmt(D(z.earliest))}`); return; }
+  if(z && t.dataset.urgent!==undefined){ z.urgent=t.checked; changed(`${z.name}: ${z.urgent?'marked urgent — jumps the queue':'urgent flag removed'}`); return; }
   if(z && t.dataset.v1delivered!==undefined){ z.v1Delivered=t.value||null; changed(z.v1Delivered?`First version marked delivered ${fmt(D(z.v1Delivered))}`:'First-version delivery date cleared'); return; }
   if(z && t.dataset.v1start!==undefined){ z.v1Start=t.value||null; changed(z.v1Start?`First version start set to ${fmt(D(z.v1Start))}`:'First-version start date cleared'); return; }
   if(z && t.dataset.revnote!==undefined){ z.revisionNote=t.value; dbSaveZone(z); render(); return; }
