@@ -14,6 +14,7 @@
   --appr:#C9E4CF; --appr-t:#2F6B3F;
   --rev:#EDC9CD;  --rev-t:#8E4750;
   --pause:#F2DFB6;--pause-t:#7C5E1E;
+  --inprog:#C8E6EC; --inprog-t:#1F6B7A;
   --ns:#EEECE8;   --ns-b:#C9C5BE;
   --viz:#EDC9CD;  --wd:#CBD9EC;
   --pot:#EEEAF7;  --pot-b:#B9AEE3; --pot-t:#5A4C9C;
@@ -403,10 +404,11 @@ let PROJECTS = [
    thecove: potential — status keeps it out of confirmed totals and off the real team calendar. */
 /* contract: Palm villa M109, 730 sqm, Mr. Majed, Dubai — total AED 136,800 (incl. special discount), issued 30/06/2026 */
 const STATUS = {
-  approved:{lab:'Approved',    col:'var(--appr)',  ink:'var(--appr-t)'},
-  revision:{lab:'Revision',    col:'var(--rev)',   ink:'var(--rev-t)'},
-  paused:  {lab:'Paused',      col:'var(--pause)', ink:'var(--pause-t)'},
-  pending: {lab:'Not started', col:'var(--ns)',    ink:'var(--ink-2)'},
+  approved:  {lab:'Approved',    col:'var(--appr)',   ink:'var(--appr-t)'},
+  revision:  {lab:'Revision',    col:'var(--rev)',    ink:'var(--rev-t)'},
+  inprogress:{lab:'In progress', col:'var(--inprog)', ink:'var(--inprog-t)'},
+  paused:    {lab:'Paused',      col:'var(--pause)',  ink:'var(--pause-t)'},
+  pending:   {lab:'Not started', col:'var(--ns)',     ink:'var(--ink-2)'},
 };
 const REASONS = ['Sent to client — awaiting feedback','Waiting for client','Waiting for approval','Waiting for information','Internal hold'];
 
@@ -566,7 +568,7 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const state = {
   tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
   ganttDisc:'all', ganttOpen:{}, ganttZoom:'week', quickSetupOpen:false, roomsView:'dashboard',
-  calSubview:'fit', teamCalPerson:null, teamCalMonthOffset:0, teamCalSelDay:null, scheduleIssues:[],
+  calSubview:'fit', teamCalPerson:null, teamCalMonthOffset:0, teamCalSelDay:null, scheduleIssues:[], expandedNotes:{},
   planView:'gantt', planProject:null, projCalMonthOffset:0, projCalSelDay:null, projCalDisc:'all',
   sim:{name:'Tanger 2', team:'viz', ran:false, pick:0, floors:[{name:'Ground', rooms:6, days:2},{name:'First', rooms:8, days:2}]},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
@@ -606,6 +608,13 @@ function active(z){
   return z.effort;
 }
 function floorOrder(f){ return ({'Ground':1,'1 floor':1,'First':2,'2 floor':2,'Second':3,'Exterior':4,'Hall':1,'AD':5,'LS':6})[f]||9 }
+/* 0.125d = 1 год (8-годинний день) — лише для показу; розклад усе одно бронює людині цілий календарний день */
+function fmtEffortHM(d){
+  if(d < 1){ const h=Math.round(d*8*4)/4; return (h%1===0?h:h.toFixed(2).replace(/0+$/,'').replace(/\.$/,''))+'h'; }
+  if(Number.isInteger(d)) return d+'d';
+  const days=Math.floor(d), hrs=Math.round((d-days)*8);
+  return hrs? `${days}d ${hrs}h` : `${days}d`;
+}
 
 /* ---------- Scope: іменоване групування кімнат/пакетів на поверсі під одного виконавця ---------- */
 function initials(m){ return (m.name||'?').slice(0,2).toUpperCase() }
@@ -690,15 +699,16 @@ function recalc(){ S = build(); render(); }
 function breakdown(list){
   const by = st => list.filter(z=>z.status===st);
   const w  = arr => arr.reduce((n,z)=>n+z.effort,0);
-  const appr=by('approved'), rev=by('revision'), pau=by('paused'), pen=by('pending');
+  const appr=by('approved'), rev=by('revision'), ip=by('inprogress'), pau=by('paused'), pen=by('pending');
   return {
     total:list.length, totalW:w(list),
     appr:appr.length, apprW:w(appr),
     rev:rev.length, revW:rev.reduce((n,z)=>n+(z.revEffort||1),0),
+    ip:ip.length, ipW:w(ip),
     pau:pau.length, pauW:w(pau),
     pen:pen.length, penW:w(pen),
-    remaining: rev.length+pau.length+pen.length,
-    left: rev.reduce((n,z)=>n+(z.revEffort||1),0) + w(pen),
+    remaining: rev.length+ip.length+pau.length+pen.length,
+    left: rev.reduce((n,z)=>n+(z.revEffort||1),0) + w(ip) + w(pen),
   };
 }
 function finishOf(list){
@@ -1514,13 +1524,24 @@ function roomsTable(pr, disc, zones, floors){
             const it = S.byId.get(z.id);
             return `<tr>
               <td style="text-align:left"><input data-tbl-rename="${z.id}" value="${esc(z.name)}" style="width:100%;min-width:90px;border:0;background:none;font:inherit;font-size:13px;color:var(--ink);padding:2px 0">${z.scope?`<div class="muted" style="font-size:10.5px">${esc(z.scope)}</div>`:''}</td>
-              <td class="num"><input type="number" min="0.5" step="0.5" value="${z.effort}" data-tbl-effort="${z.id}" style="width:54px;text-align:right;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px"></td>
+              <td class="num">${z.status==='revision'
+                ? `<input type="number" min="0.0625" step="0.0625" value="${z.revEffort}" data-tbl-reveffort="${z.id}" title="Revision effort — ${fmtEffortHM(z.revEffort)}" style="width:54px;text-align:right;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px">
+                   <div class="muted" style="font-size:9.5px;margin-top:2px">${fmtEffortHM(z.revEffort)} fix</div>`
+                : `<input type="number" min="0.5" step="0.5" value="${z.effort}" data-tbl-effort="${z.id}" style="width:54px;text-align:right;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px">`}</td>
               <td style="text-align:left"><select data-tbl-assign="${z.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px;max-width:110px">
                 <option value="">—</option>${TEAM.filter(m=>m.team===disc).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></td>
               <td style="text-align:left"><select data-tbl-status="${z.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px">
                 ${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${z.status===k?'selected':''}>${v.lab}</option>`).join('')}</select></td>
               <td style="text-align:left">${z.status==='revision'
-                ? `<input data-tbl-revnote="${z.id}" value="${esc(z.revisionNote||'')}" placeholder="what needs fixing" style="width:100%;min-width:130px;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 7px;font-size:12px">`
+                ? (state.expandedNotes[z.id]
+                    ? `<div style="display:flex;flex-direction:column;gap:4px;min-width:150px">
+                        <textarea data-tbl-revnote="${z.id}" rows="2" placeholder="what needs fixing" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:5px 7px;font-size:12px;font:inherit;resize:vertical">${esc(z.revisionNote||'')}</textarea>
+                        <button data-note-collapse="${z.id}" style="align-self:flex-start;border:0;background:none;color:var(--muted);font-size:10.5px;cursor:pointer;text-decoration:underline">Collapse</button>
+                      </div>`
+                    : `<div style="display:flex;align-items:center;gap:6px;min-width:130px">
+                        <input data-tbl-revnote="${z.id}" value="${esc(z.revisionNote||'')}" placeholder="what needs fixing" style="flex:1;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 7px;font-size:12px">
+                        <button data-note-expand="${z.id}" title="Expand" style="border:0;background:none;color:var(--muted);font-size:13px;cursor:pointer;flex:none">⤢</button>
+                      </div>`)
                 : `<span class="muted">—</span>`}</td>
               <td style="text-align:left;font-size:11.5px;white-space:nowrap;cursor:pointer;color:var(--ink-2);text-decoration:underline dotted" data-resched="${z.id}" title="Click to change the date or duration">${it&&it.s? fmt(D(it.s))+' – '+fmt(D(it.e)) : (z.status==='approved'?'done':'—')}</td>
               <td><button data-tbl-remove="${z.id}" title="Remove" style="border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1">×</button></td>
@@ -1581,6 +1602,7 @@ function viewProduction(){
     <section class="card">
       <div class="card-h"><h2>${dc.unit[0].toUpperCase()+dc.unit.slice(1)} by floor</h2><span class="hint">${state.roomsView==='table'?'edit effort, executor and status right in the grid':'1 square = 1 '+dc.unit1+' · tap to edit'}</span>
         <div class="spacer"></div>
+        ${zones.filter(z=>z.status==='revision').length>1? `<button class="pill" data-sequence-revisions="${pr.id}|${state.disc}">Sequence revisions</button>`:''}
         <div class="seg"><button data-rooms-view="dashboard" aria-pressed="${state.roomsView!=='table'}">Dashboard</button><button data-rooms-view="table" aria-pressed="${state.roomsView==='table'}">Table</button></div>
       </div>
       <div class="card-b">
@@ -1618,6 +1640,7 @@ function viewProduction(){
         ${state.roomsView!=='table'? `<div class="legend">
           <span><i style="background:var(--appr)"></i>Approved</span>
           <span><i style="background:var(--rev)"></i>Revision</span>
+          <span><i style="background:var(--inprog)"></i>In progress</span>
           <span><i style="background:var(--pause)"></i>Paused</span>
           <span><i style="background:var(--ns);border:1px dashed var(--ns-b)"></i>Not started</span>
         </div>`:''}
@@ -1713,7 +1736,7 @@ function financeCard(pid){
 }
 
 function donut(b, dc){
-  const seg=[['approved',b.appr],['revision',b.rev],['paused',b.pau],['pending',b.pen]];
+  const seg=[['approved',b.appr],['revision',b.rev],['inprogress',b.ip],['paused',b.pau],['pending',b.pen]];
   const R=62, C=2*Math.PI*R, total=b.total||1;
   let off=0;
   const arcs = seg.map(([k,n])=>{
@@ -1731,6 +1754,7 @@ function donut(b, dc){
     <div class="dl">
       ${row('approved','Approved',b.appr,b.apprW)}
       ${row('revision','Revision',b.rev,b.revW)}
+      ${b.ip? row('inprogress','In progress',b.ip,b.ipW) : ''}
       ${row('paused','Paused',b.pau,b.pauW)}
       ${row('pending','Not started',b.pen,b.penW)}
       <div class="r"><i style="background:var(--ink)"></i><span class="n"><b>Remaining effort</b></span><b>${b.remaining} ${dc.unit}</b>
@@ -1790,6 +1814,7 @@ function studioProgressPanel(){
             <div class="legend">
               <span><i style="background:var(--appr)"></i>Approved</span>
               <span><i style="background:var(--rev)"></i>Revision</span>
+              <span><i style="background:var(--inprog)"></i>In progress</span>
               <span><i style="background:var(--pause)"></i>Paused</span>
               <span><i style="background:var(--ns);border:1px dashed var(--ns-b)"></i>Not started</span>
             </div>
@@ -2060,7 +2085,8 @@ function teamCalendarView(){
               ${task? `<div style="background:${person(task.z.a).color};border-radius:7px;padding:5px 6px;line-height:1.3">
                   <div style="font-size:10.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj(task.z.p).name)}</div>
                   <div style="font-size:9px;color:var(--ink-2)">${DISC[task.z.d].short} · ${esc(task.z.scope||task.z.name)}</div>
-                  <div style="font-size:9px;color:var(--ink-2);margin-top:1px">${task.idx}/${task.total}d</div>
+                  ${task.z.status==='revision'? `<div style="font-size:9px;color:var(--rev-t);font-weight:600;margin-top:1px">Revision${task.z.revisionNote?': '+esc(task.z.revisionNote.slice(0,28))+(task.z.revisionNote.length>28?'…':''):''}</div>`
+                    : `<div style="font-size:9px;color:var(--ink-2);margin-top:1px">${task.idx}/${task.total}d</div>`}
                 </div>` : ''}
             </div>`;
           }).join('')}
@@ -2077,6 +2103,7 @@ function teamCalendarView(){
               <div class="muted" style="font-size:12.5px;margin-top:3px">${DISC[selTask.z.d].name} · ${esc(selTask.z.floor)}${selTask.z.scope?' · '+esc(selTask.z.scope):''}</div>
               <div style="margin-top:10px;font-size:13px">${esc(selTask.z.name)} · day ${selTask.idx} of ${selTask.total}</div>
               <div style="margin-top:6px"><span class="status-chip" style="background:${STATUS[selTask.z.status].col};color:${STATUS[selTask.z.status].ink};font-size:11px">${STATUS[selTask.z.status].lab}</span></div>
+              ${selTask.z.status==='revision' && selTask.z.revisionNote? `<div style="margin-top:10px;padding:10px;background:var(--line-2);border-radius:9px;font-size:12.5px">${esc(selTask.z.revisionNote)}</div>`:''}
             </div>`}
       </div>
     </section>
@@ -2540,6 +2567,40 @@ function openRescheduleDrawer(id){
     </div>`);
 }
 
+/* ---------- Sequence revisions: швидко вишикувати кілька правок одна за одною, одна стартова дата на всіх ---------- */
+function openSequenceRevisions(pid, disc){
+  const revZones = Z.filter(z=>z.p===pid && z.d===disc && z.status==='revision');
+  if(!revZones.length){ toast('No revisions to sequence here'); return; }
+  state.seqOrder = revZones.sort((a,b)=>D(a.earliest)-D(b.earliest)).map(z=>z.id);
+  state.seqStart = iso(TODAY);
+  renderSequenceDrawer();
+}
+function renderSequenceDrawer(){
+  const order = state.seqOrder.map(id=>Z.find(z=>z.id===id)).filter(Boolean);
+  if(!order.length){ closeDrawer(); return; }
+  let cum = 0;
+  drawer(`<button class="x" data-close aria-label="Close">×</button>
+    <h3>Sequence revisions</h3>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 16px">Reorder with ▲▼, set one start date — each fix begins right after the one before it finishes.</p>
+    <div class="field"><div class="fl">Start from</div>
+      <input type="date" id="seqStartInput" value="${state.seqStart}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px"></div>
+    ${order.map((z,i)=>{
+      const dayOffset = cum; cum += Math.max(1, Math.ceil(z.revEffort));
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2)">
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <button data-seq-up="${i}" ${i===0?'disabled':''} style="border:0;background:none;color:${i===0?'var(--line)':'var(--muted)'};cursor:pointer;font-size:12px;line-height:1.2">▲</button>
+          <button data-seq-down="${i}" ${i===order.length-1?'disabled':''} style="border:0;background:none;color:${i===order.length-1?'var(--line)':'var(--muted)'};cursor:pointer;font-size:12px;line-height:1.2">▼</button>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px">${esc(proj(z.p).name)} · ${esc(z.name)}</div>
+          <div class="muted" style="font-size:11px">${fmtEffortHM(z.revEffort)} · ${z.a?esc(person(z.a).name):'unassigned'}${z.revisionNote?' · '+esc(z.revisionNote.slice(0,36))+(z.revisionNote.length>36?'…':''):''}</div>
+        </div>
+        <div class="muted" style="font-size:11px;min-width:34px;text-align:right">day ${dayOffset+1}</div>
+      </div>`;
+    }).join('')}
+    <button class="btn" data-seq-apply style="margin-top:18px;width:100%">Apply sequence</button>`);
+}
+
 function openZone(id){
   const z = Z.find(x=>x.id===id); if(!z) return;
   state.selZone=id;
@@ -2564,7 +2625,10 @@ function openZone(id){
       <div class="muted" style="font-size:12px;margin-top:7px">Set once you actually hand this version to the client — not tracked automatically, leave empty until then.</div></div>
 
     ${z.status==='revision'?`<div class="field"><div class="fl">Revision effort</div>
-      <div class="stepper"><button data-rev="-0.5">−</button><span>${z.revEffort} d</span><button data-rev="0.5">+</button></div></div>
+      <div class="stepper"><button data-rev="-0.0625" title="−30 min">−30m</button><button data-rev="-0.125" title="−1 hour">−1h</button>
+        <span style="padding:0 10px">${fmtEffortHM(z.revEffort)}</span>
+        <button data-rev="0.125" title="+1 hour">+1h</button><button data-rev="0.0625" title="+30 min">+30m</button></div>
+      <div class="muted" style="font-size:11.5px;margin-top:7px">Tracks the real time a fix takes — the schedule still books that person a full calendar day for it, same as any other task.</div></div>
 
     <div class="field"><div class="fl">What needs fixing</div>
       <textarea data-revnote rows="3" placeholder="e.g. lighter wood tone, move the pendant light left" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px;font:inherit;font-size:13.5px;resize:vertical">${esc(z.revisionNote||'')}</textarea></div>`:''}
@@ -2677,6 +2741,23 @@ document.addEventListener('click', e=>{
   if(n=el('[data-person-load]')){ openLoadDetail(n.dataset.personLoad, null); return; }
   if(n=el('[data-open-zone]')){ openZone(n.dataset.openZone); return; }
   if(n=el('[data-zone]')){ openZone(n.dataset.zone); render(); openZone(n.dataset.zone); return; }
+  if(n=el('[data-seq-up]')){ const i=+n.dataset.seqUp; if(i>0){ [state.seqOrder[i-1],state.seqOrder[i]]=[state.seqOrder[i],state.seqOrder[i-1]]; renderSequenceDrawer(); } return; }
+  if(n=el('[data-seq-down]')){ const i=+n.dataset.seqDown; if(i<state.seqOrder.length-1){ [state.seqOrder[i+1],state.seqOrder[i]]=[state.seqOrder[i],state.seqOrder[i+1]]; renderSequenceDrawer(); } return; }
+  if(n=el('[data-seq-apply]')){
+    const startVal = document.getElementById('seqStartInput').value; if(!startVal) return;
+    let d = D(startVal);
+    state.seqOrder.forEach(id=>{
+      const z = Z.find(x=>x.id===id); if(!z) return;
+      z.earliest = iso(d); dbSaveZone(z);
+      d = addDays(d, Math.max(1, Math.ceil(z.revEffort)));
+    });
+    S=build(); closeDrawer(); render();
+    toast(`${state.seqOrder.length} revisions sequenced from ${fmt(D(startVal))}`);
+    return;
+  }
+  if(n=el('[data-sequence-revisions]')){ openSequenceRevisions(n.dataset.sequenceRevisions.split('|')[0], n.dataset.sequenceRevisions.split('|')[1]); return; }
+  if(n=el('[data-note-expand]')){ state.expandedNotes[n.dataset.noteExpand]=true; render(); return; }
+  if(n=el('[data-note-collapse]')){ delete state.expandedNotes[n.dataset.noteCollapse]; render(); return; }
   if(n=el('[data-rooms-view]')){ state.roomsView=n.dataset.roomsView; render(); return; }
   if(n=el('[data-tbl-remove]')){
     const id=n.dataset.tblRemove, z=Z.find(x=>x.id===id); if(!z) return;
@@ -2792,7 +2873,7 @@ document.addEventListener('click', e=>{
   const z = curZone();
   if(z && (n=el('[data-set-status]'))){ z.status=n.dataset.setStatus; if(z.status==='paused'&&!z.reason) z.reason=REASONS[0]; changed(`${z.name}: ${STATUS[z.status].lab}`); return; }
   if(z && (n=el('[data-eff]'))){ z.effort=Math.max(0.5, Math.round((z.effort+ +n.dataset.eff)*2)/2); changed(`${z.name}: ${z.effort} days`); return; }
-  if(z && (n=el('[data-rev]'))){ z.revEffort=Math.max(0.5, Math.round((z.revEffort+ +n.dataset.rev)*2)/2); changed(`${z.name}: revision ${z.revEffort} days`); return; }
+  if(z && (n=el('[data-rev]'))){ z.revEffort=Math.max(0.0625, Math.round((z.revEffort+ +n.dataset.rev)*16)/16); changed(`${z.name}: revision ${fmtEffortHM(z.revEffort)}`); return; }
   if(z && (n=el('[data-outsource]'))){
     if(n.dataset.outsource==='on'){ if(!z.a){ toast('Assign a person first'); return; } z.outsource={cost: Math.round(z.effort*nominalRate(z.a))}; }
     else { z.outsource=null; }
@@ -2921,6 +3002,7 @@ document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
   if(t.id==='projSel'){ state.project=t.value; render(); return; }
   if(t.id==='ganttProjSel'){ state.planProject=t.value; render(); return; }
+  if(t.id==='seqStartInput'){ state.seqStart=t.value||state.seqStart; return; }
   if(t.id==='teamCalPerson'){ state.teamCalPerson=t.value; state.teamCalSelDay=null; render(); return; }
   if(t.dataset.simFloorName!==undefined){ state.sim.floors[+t.dataset.simFloorName].name=t.value.trim()||'Floor'; render(); return; }
   if(t.dataset.simFloorRooms!==undefined){ state.sim.floors[+t.dataset.simFloorRooms].rooms=Math.max(1,Math.round(+t.value||1)); render(); return; }
@@ -2933,6 +3015,10 @@ document.addEventListener('change', e=>{
     const zz=Z.find(x=>x.id===t.dataset.tblRename); if(!zz) return;
     const newName=t.value.trim(); if(!newName){ t.value=zz.name; return; }
     zz.name=newName; dbSaveZone(zz); render(); return;
+  }
+  if(t.dataset.tblReveffort!==undefined){
+    const zz=Z.find(x=>x.id===t.dataset.tblReveffort); if(!zz) return;
+    zz.revEffort=Math.max(0.0625, Math.round((+t.value||0.0625)*16)/16); dbSaveZone(zz); S=build(); render(); return;
   }
   if(t.dataset.tblEffort!==undefined){
     const zz=Z.find(x=>x.id===t.dataset.tblEffort); if(!zz) return;
