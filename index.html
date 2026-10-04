@@ -406,7 +406,7 @@ const STATUS = {
   paused:  {lab:'Paused',      col:'var(--pause)', ink:'var(--pause-t)'},
   pending: {lab:'Not started', col:'var(--ns)',    ink:'var(--ink-2)'},
 };
-const REASONS = ['Waiting for client','Waiting for approval','Waiting for information','Internal hold'];
+const REASONS = ['Sent to client — awaiting feedback','Waiting for client','Waiting for approval','Waiting for information','Internal hold'];
 
 /* ЗОНА = кімната (3D) або пакет креслень. effort — дні на першу версію. */
 let Z = [];
@@ -564,6 +564,7 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const state = {
   tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
   ganttDisc:'all', ganttOpen:{}, ganttZoom:'week', quickSetupOpen:false, roomsView:'dashboard',
+  calSubview:'fit', teamCalPerson:null, teamCalMonthOffset:0, teamCalSelDay:null, scheduleIssues:[],
   sim:{name:'Tanger 2', effort:30, team:'viz', ran:true, pick:0},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
   potentials:[
@@ -1013,6 +1014,40 @@ function ganttHead(cols){
   return `<div class="tl-head gantt-head"><div></div><div class="tl-weeks">${cols.map(c=>`<span>${c.label}</span>`).join('')}</div></div>`;
 }
 function barColorFor(team){ return team.length ? person(team[0].id).color : 'var(--ns)'; }
+/* знімок "коли людина закінчує роботу на проєкті" — до і після зміни, щоб ловити побічні затримки */
+function scheduleFinishSnapshot(){
+  const map = {};
+  TEAM.forEach(m=>{
+    PROJECTS.filter(p=>p.status==='confirmed').forEach(p=>{
+      const zs = Z.filter(z=>z.a===m.id && z.p===p.id && active(z)>0);
+      if(!zs.length) return;
+      const sp = spanOfZones(zs);
+      if(sp) map[`${m.id}|${p.id}`] = iso(sp.e);
+    });
+  });
+  return map;
+}
+function issuesBanner(){
+  if(!state.scheduleIssues.length) return '';
+  return `<section class="card" style="margin-bottom:16px;border-color:var(--warn-t)">
+    <div class="card-h"><h2 style="color:var(--warn-t)">Scheduling issues</h2><span class="hint">surfaced by a recent start-date change — mark resolved once you've dealt with it</span></div>
+    <div class="card-b">
+      ${state.scheduleIssues.map(i=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2)">
+        <div style="flex:1;font-size:13.5px">${esc(i.text)}</div>
+        <button class="pill" data-issue-resolve="${i.id}">Resolved</button>
+      </div>`).join('')}
+    </div>
+  </section>`;
+}
+/* напис для рядка без розкладу — причина паузи, якщо вона є, замість голого "not scheduled" */
+function groupStatusNote(zones){
+  const paused = zones.filter(z=>z.status==='paused');
+  if(!paused.length) return 'not scheduled';
+  const reasons = [...new Set(paused.map(z=>z.reason).filter(Boolean))];
+  return reasons.length===1 ? `Paused — ${reasons[0]}` : `Paused (${paused.length})`;
+}
+/* "In progress" — сьогодні потрапляє в реальний запланований діапазон групи */
+function inProgressTag(span){ return span && D(iso(TODAY))>=span.s && D(iso(TODAY))<=span.e; }
 
 /* сегменти календаря людини, що належать САМЕ цьому проєкту — не весь її графік, лише ця робота */
 function projectBlocksOf(personId, projectId, r){
@@ -1080,11 +1115,11 @@ function ganttSection(projectId, {embedded=false}={}){
       const fz = dz.filter(z=>z.floor===f);
       const fkey = `${pr.id}|${d}|${f}`;
       const team = floorTeam(fz);
-      rows.push({kind:'floor', disc:d, floor:f, fkey, label:f, team, effort:fz.reduce((n,z)=>n+z.effort,0), span:spanOfZones(fz)});
+      rows.push({kind:'floor', disc:d, floor:f, fkey, label:f, team, effort:fz.reduce((n,z)=>n+z.effort,0), span:spanOfZones(fz), zones:fz});
       if(state.ganttOpen[fkey]){
         scopesOf(fz).forEach(g=>{
           rows.push({kind:'scope', disc:d, floor:f, fkey, label:g.name, team:g.assignees.map(id=>({id})), effort:g.effort, span:spanOfZones(g.zones),
-            single:g.single, zoneId:g.single?g.zones[0].id:null});
+            single:g.single, zoneId:g.single?g.zones[0].id:null, zones:g.zones});
         });
       }
     });
@@ -1123,13 +1158,13 @@ function ganttSection(projectId, {embedded=false}={}){
                 <div style="min-width:0;overflow:hidden"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
                   <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
               </div>
-              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
-                : `<div class="muted" style="font-size:10.5px;padding:7px 0">not scheduled</div>`}</div></div>`;
+              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(inProgressTag(row.span)?'In progress · ':'')+(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
+                : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
           }
           return `<div class="tl-row gantt-row child" style="cursor:pointer" ${row.single?`data-resched="${row.zoneId}"`:`data-scope-open="${row.fkey}|${esc(row.label)}"`}>
             <div class="tl-lab" style="padding-left:26px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
               <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : ''}</div></div>`;
+            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(inProgressTag(row.span)?'In progress · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
         }).join('') : '<div class="muted" style="padding:20px 18px">No work in this discipline yet.</div>'}
       </div></div>
     </div>
@@ -1584,6 +1619,7 @@ function viewLoad(){
 
   return `
   <div class="head"><h1>Studio load · all projects</h1></div>
+  ${issuesBanner()}
   <div class="kpis">
     <div class="kpi"><div class="l">Confirmed effort</div><div class="v">${confirmed} days</div><div class="f">left in confirmed projects</div></div>
     <div class="kpi"><div class="l">Capacity</div><div class="v">${capacity} days</div><div class="f">${TEAM.length} people · ${inRange} working days</div></div>
@@ -1705,7 +1741,86 @@ function viewPotential(){
 /* ======================================================================
    VIEW 4 · RESOURCE CALENDAR
    ====================================================================== */
+/* ---------- Team calendar: по днях, для однієї людини, зібрано напряму з S (той самий розклад, що й усюди) ---------- */
+function monthGridDays(y, mo){
+  const start = monday(new Date(y, mo, 1));
+  return Array.from({length:42}, (_,i)=>addDays(start,i));
+}
+function dayTaskFor(personId, day){
+  const occ = S.occ[personId]; if(!occ) return null;
+  const key = iso(day), zid = occ.get(key); if(!zid) return null;
+  const z = Z.find(x=>x.id===zid), it = S.byId.get(zid);
+  if(!z || !it) return null;
+  const idx = it.days.indexOf(key);
+  return {z, idx: idx+1, total: it.days.length};
+}
+function teamCalendarView(){
+  const pid = state.teamCalPerson && person(state.teamCalPerson) ? state.teamCalPerson : TEAM[0].id;
+  const off = state.teamCalMonthOffset||0;
+  const base = new Date(TODAY.getFullYear(), TODAY.getMonth()+off, 1);
+  const y=base.getFullYear(), mo=base.getMonth();
+  const days = monthGridDays(y, mo);
+  const monthLabel = base.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const dow = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const selDay = state.teamCalSelDay;
+  const selTask = selDay ? dayTaskFor(pid, D(selDay)) : null;
+  return `
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+    <select id="teamCalPerson" class="sel">${TEAM.map(m=>`<option value="${m.id}" ${m.id===pid?'selected':''}>${esc(m.name)} · ${ROLE_LABEL[m.team]||m.team}</option>`).join('')}</select>
+    <button class="pill" data-teamcal-shift="-1">‹</button>
+    <span style="font-weight:500;min-width:140px">${monthLabel}</span>
+    <button class="pill" data-teamcal-shift="1">›</button>
+    <button class="pill" data-teamcal-shift="0">Today</button>
+  </div>
+  <div class="grid2" style="grid-template-columns:1fr 300px">
+    <section class="card">
+      <div class="card-b" style="padding:14px">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px">
+          ${dow.map(d=>`<div class="muted" style="font-size:10.5px;text-align:center">${d}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+          ${days.map(d=>{
+            const inMonth = d.getMonth()===mo;
+            const task = dayTaskFor(pid, d);
+            const isToday = iso(d)===iso(TODAY);
+            const sel = selDay===iso(d);
+            return `<div data-teamcal-day="${iso(d)}" style="min-height:74px;border-radius:10px;padding:6px;cursor:pointer;background:${sel?'var(--line-2)':'transparent'};border:1.5px solid ${isToday?'var(--ink-2)':'transparent'};opacity:${inMonth?1:.32}">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${d.getDate()}</div>
+              ${task? `<div style="background:${person(task.z.a).color};border-radius:7px;padding:5px 6px;line-height:1.3">
+                  <div style="font-size:10.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj(task.z.p).name)}</div>
+                  <div style="font-size:9px;color:var(--ink-2)">${DISC[task.z.d].short} · ${esc(task.z.scope||task.z.name)}</div>
+                  <div style="font-size:9px;color:var(--ink-2);margin-top:1px">${task.idx}/${task.total}d</div>
+                </div>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>${selDay? fmt(D(selDay)) : 'Pick a day'}</h2></div>
+      <div class="card-b">
+        ${!selDay? `<div class="muted" style="font-size:13px">Click any day to see what ${esc(person(pid).name)} is working on.</div>`
+          : !selTask? `<div class="muted" style="font-size:13px">Nothing scheduled for ${esc(person(pid).name)} this day.</div>`
+          : `<div style="cursor:pointer" data-open-zone="${selTask.z.id}">
+              <div style="font-size:15px">${esc(proj(selTask.z.p).name)}</div>
+              <div class="muted" style="font-size:12.5px;margin-top:3px">${DISC[selTask.z.d].name} · ${esc(selTask.z.floor)}${selTask.z.scope?' · '+esc(selTask.z.scope):''}</div>
+              <div style="margin-top:10px;font-size:13px">${esc(selTask.z.name)} · day ${selTask.idx} of ${selTask.total}</div>
+              <div style="margin-top:6px"><span class="status-chip" style="background:${STATUS[selTask.z.status].col};color:${STATUS[selTask.z.status].ink};font-size:11px">${STATUS[selTask.z.status].lab}</span></div>
+            </div>`}
+      </div>
+    </section>
+  </div>
+  <p class="muted" style="font-size:11.5px;margin-top:12px">Pulled straight from the same schedule as Project calculator and Production plan — change anything there and it updates here too.</p>`;
+}
+
 function viewCalendar(){
+  const sub = state.calSubview||'fit';
+  return `<div class="head"><h1>Resource calendar</h1><div class="spacer"></div>
+    <div class="seg"><button data-cal-subview="fit" aria-pressed="${sub==='fit'}">Fit finder</button><button data-cal-subview="calendar" aria-pressed="${sub==='calendar'}">Team calendar</button></div>
+  </div>
+  ${sub==='calendar'? teamCalendarView() : viewFitFinder()}`;
+}
+function viewFitFinder(){
   const c = state.cal, dc = DISC[c.team];
   const people = TEAM.filter(m=>m.team===c.team);
   const plans = {}; people.forEach(m=>{ plans[m.id] = c.mode==='block' ? continuousPlan(m.id,c.effort) : splitPlan(m.id,c.effort); });
@@ -1713,7 +1828,6 @@ function viewCalendar(){
   const best = ranked[0];
 
   return `
-  <div class="head"><h1>Resource calendar</h1></div>
   <section class="card" style="margin-bottom:16px">
     <div class="card-h"><h2>Where does the next project fit?</h2><span class="hint">overlay a calculated effort onto real calendars, person by person</span></div>
     <div class="card-b">
@@ -2313,6 +2427,14 @@ document.addEventListener('click', e=>{
     toast(`${name}: ${rooms} ${DISC[disc].unit} added`); return;
   }
   if(n=el('[data-resched]')){ openRescheduleDrawer(n.dataset.resched); return; }
+  if(n=el('[data-issue-resolve]')){ state.scheduleIssues=state.scheduleIssues.filter(i=>i.id!==n.dataset.issueResolve); render(); toast('Marked resolved'); return; }
+  if(n=el('[data-cal-subview]')){ state.calSubview=n.dataset.calSubview; render(); return; }
+  if(n=el('[data-teamcal-shift]')){
+    const v=n.dataset.teamcalShift;
+    state.teamCalMonthOffset = v==='0' ? 0 : (state.teamCalMonthOffset||0)+(+v);
+    state.teamCalSelDay=null; render(); return;
+  }
+  if(n=el('[data-teamcal-day]')){ state.teamCalSelDay = n.dataset.teamcalDay; render(); return; }
   if(n=el('[data-resched-apply]')){
     const id = n.dataset.reschedApply, zz = Z.find(x=>x.id===id); if(!zz) return;
     const newStart = document.getElementById('reschedStart').value;
@@ -2503,6 +2625,7 @@ document.addEventListener('click', e=>{
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
   if(t.id==='projSel' || t.id==='ganttProjSel'){ state.project=t.value; render(); return; }
+  if(t.id==='teamCalPerson'){ state.teamCalPerson=t.value; state.teamCalSelDay=null; render(); return; }
   if(t.dataset.tblRename!==undefined){
     const zz=Z.find(x=>x.id===t.dataset.tblRename); if(!zz) return;
     const newName=t.value.trim(); if(!newName){ t.value=zz.name; return; }
@@ -2525,10 +2648,25 @@ document.addEventListener('change', e=>{
   if(t.id==='projStart'){
     const newDate = t.value; if(!newDate) return;
     const p = proj(state.project);
+    const before = scheduleFinishSnapshot();
     const zs = Z.filter(z=>z.p===p.id);
     zs.forEach(z=>{ z.earliest=newDate; dbSaveZone(z); });
-    S=build(); render();
-    toast(`${p.name}: nothing starts before ${fmt(D(newDate))}`); return;
+    S=build();
+    const after = scheduleFinishSnapshot();
+    const delays = [];
+    Object.keys(after).forEach(key=>{
+      const [pid, projId] = key.split('|');
+      if(projId===p.id) return; // очікувана, навмисна зміна — не issue
+      const b=before[key], a=after[key];
+      if(b && a && D(a)>D(b)) delays.push({person:pid, project:projId, before:b, after:a});
+    });
+    delays.forEach(d=>state.scheduleIssues.push({
+      id:'iss'+Date.now()+Math.random().toString(36).slice(2,6),
+      text:`Moving ${p.name}'s start to ${fmt(D(newDate))} pushed ${person(d.person).name}'s ${proj(d.project).name} finish from ${fmt(D(d.before))} to ${fmt(D(d.after))}.`,
+    }));
+    render();
+    toast(`${p.name}: nothing starts before ${fmt(D(newDate))}${delays.length? ` · ${delays.length} knock-on delay${delays.length>1?'s':''} flagged`:''}`);
+    return;
   }
   if(t.dataset.scopeReassign!==undefined){
     const [pid,disc,floor,name] = t.dataset.scopeReassign.split('|');
