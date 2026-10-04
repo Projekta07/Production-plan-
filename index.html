@@ -76,7 +76,7 @@ h1{font-size:34px;font-weight:500;letter-spacing:-.025em;margin:0}
 .stack{display:flex;flex-direction:column;gap:16px}
 
 /* ---------- rooms by floor ---------- */
-.floor{display:grid;grid-template-columns:96px minmax(0,1fr) 64px;gap:14px;align-items:center;padding:12px 0}
+.floor{display:grid;grid-template-columns:96px minmax(0,1fr) 64px 22px;gap:14px;align-items:center;padding:12px 0}
 .floor+.floor{border-top:1px solid var(--line-2)}
 .floor .fn{font-size:15px}
 .floor .fc{color:var(--muted);font-size:12.5px;margin-top:2px}
@@ -232,6 +232,28 @@ h1{font-size:34px;font-weight:500;letter-spacing:-.025em;margin:0}
   font-size:13.5px;z-index:60;opacity:0;pointer-events:none;transition:.2s;max-width:92vw}
 .toast[data-show="true"]{opacity:1;transform:translate(-50%,0)}
 .muted{color:var(--muted)}
+.av{width:26px;height:26px;border-radius:50%;display:inline-grid;place-items:center;font-size:10px;font-weight:600;color:var(--ink);flex:none;border:2px solid var(--card);box-sizing:content-box}
+.av.sm{width:21px;height:21px;font-size:9px}
+.av.lg{width:34px;height:34px;font-size:12px;border-width:0}
+.av-stack{display:flex;align-items:center;cursor:pointer}
+.av-stack .av{margin-left:-8px}
+.av-stack .av:first-child{margin-left:0}
+.av-more{width:26px;height:26px;border-radius:50%;background:var(--line-2);color:var(--muted);display:inline-grid;place-items:center;font-size:10px;font-weight:600;margin-left:-8px;border:2px solid var(--card);box-sizing:content-box}
+.floor-chev{width:22px;height:22px;display:grid;place-items:center;color:var(--muted);cursor:pointer;border-radius:6px;transition:transform .15s;flex:none}
+.floor-chev:hover{background:var(--line-2);color:var(--ink)}
+.floor-chev.open{transform:rotate(90deg)}
+.scope-table{margin-top:14px;border-top:1px solid var(--line-2);padding-top:12px}
+.scope-head,.scope-row{display:grid;grid-template-columns:1.2fr 1.5fr .85fr .55fr 1fr;gap:10px;align-items:center}
+.scope-head{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.scope-row{padding:11px 0;border-bottom:1px solid var(--line-2);cursor:pointer}
+.scope-row:hover{background:var(--line-2)}
+.scope-row .sn{font-size:13.5px}
+.scope-row .sd{color:var(--muted);font-size:11px;margin-top:1px}
+.scope-row .rooms{display:flex;flex-wrap:wrap;gap:4px}
+.scope-row .rooms span{font-size:10px;color:var(--muted);background:var(--line-2);border-radius:5px;padding:2px 5px}
+.scope-row .status-chip{font-size:10.5px;padding:3px 9px;border-radius:20px;display:inline-block}
+.effort-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:9px}
+.effort-chips .ec{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}
 .tlm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
 table.tlm{border-collapse:collapse;width:100%;min-width:620px;font-size:13px}
 .tlm th,.tlm td{padding:9px 13px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line-2)}
@@ -325,9 +347,10 @@ const TODAY = new Date('2026-09-21T00:00:00');
 
 const TEAM = [
   {id:'OL', name:'Olia',    team:'viz', color:'#EDC9CD', rate:2300, type:'staff'},
+  {id:'AR', name:'Arina',   team:'viz', color:'#C9E4D8', rate:0,    type:'freelance'},
   {id:'IR', name:'Ira',     team:'viz', color:'#DCD5F0', rate:0,    type:'freelance'},
-  {id:'EV', name:'Evgeniy', team:'viz', color:'#F1DDB5', rate:1900, type:'staff'},
-  {id:'AN', name:'Julia',   team:'wd',  color:'#CBD9EC', rate:2000, type:'staff'},
+  {id:'EV', name:'Evgeniy', team:'viz', color:'#F1DDB5', rate:2100, type:'staff'},
+  {id:'AN', name:'Julia',   team:'wd',  color:'#CBD9EC', rate:1500, type:'staff'},
   {id:'KT', name:'Maria',   team:'wd',  color:'#D3E2DA', rate:1800, type:'staff'},
 ];
 /* rate = monthly in-house salary, USD (ignored for type:'freelance' — their cost is set per zone). Editable in the Finance tab. */
@@ -343,9 +366,13 @@ let PROJECTS = [
     {stage:'Detailed drawings',                                  pct:30, amount:41040, paid:false},
     {stage:'Detailed final BOQ',                                 pct:10, amount:13680, paid:false},
   ]},
-  {id:'vida',    name:'Vida',               prio:4, status:'confirmed', revenue:9500, currency:'USD', payments:[]},
+  {id:'vida',    name:'Vida',               prio:4, status:'confirmed', revenue:6380, currency:'USD', payments:[]},
   {id:'gunther', name:'Gunther restaurant', prio:3, status:'confirmed', revenue:6000, currency:'USD', payments:[]},
-  {id:'jinan5',      name:'Jinan 5',       prio:5, status:'confirmed', revenue:0, currency:'USD', payments:[]},
+  {id:'jinan5',      name:'Jinan 5',       prio:5, status:'confirmed', revenue:13750, currency:'USD', payments:[
+    {stage:'1st payment',                    pct:50, amount:6875, paid:true,  date:'2026-07-28'},
+    {stage:'2nd payment — upon receiving 3D', pct:30, amount:4125, paid:false, date:'2026-08-31'},
+    {stage:'3rd payment — upon receiving Drawings', pct:20, amount:2750, paid:false, date:'2026-09-14'},
+  ]},
   {id:'hotelmarocco',name:'Hotel Marocco', prio:6, status:'confirmed', revenue:0, currency:'USD', payments:[]},
   {id:'thecove',     name:'The Cove',      prio:9, status:'potential', revenue:0, currency:'USD', payments:[]},
 ];
@@ -371,7 +398,14 @@ function floorRooms(p, floor, code, effort, a, earliest){
     effort, status:MAP[c], a, earliest, reason: c==='P'?'Waiting for client':null}));
 }
 // Tanger 1 · 33 кімнати
-floorRooms('tanger1','Ground','AAARAAPARNN',2,'OL');
+// Tanger1 · Ground floor — той самий набір з 11 кімнат, той самий прогрес, тепер розбитий на 3 іменовані scope
+[['Room 1','A',1],['Room 2','A',2],['Room 3','A',3],['Room 5','A',5],['Room 6','A',6],['Room 8','A',8]]
+  .forEach(([nm,st,n])=>zone({p:'tanger1', d:'viz', floor:'Ground', n, name:nm, effort:2, status:MAP[st], a:'OL', scope:'Main rooms'}));
+[['Room 4','R',4],['Room 7','P',7],['Room 9','R',9]]
+  .forEach(([nm,st,n])=>zone({p:'tanger1', d:'viz', floor:'Ground', n, name:nm, effort:2, status:MAP[st], a:'AR', scope:'Bathrooms',
+    reason: st==='P'?'Waiting for client':null, outsource:{cost:0}}));
+[['Room 10','N',10],['Room 11','N',11]]
+  .forEach(([nm,st,n])=>zone({p:'tanger1', d:'viz', floor:'Ground', n, name:nm, effort:2, status:MAP[st], a:'IR', scope:'Kitchen'}));
 floorRooms('tanger1','First', 'AARANNNNNPN',2,'OL');
 floorRooms('tanger1','Second','ARNNNNNNNNN',2,'OL');
 zone({p:'tanger1', d:'viz', floor:'Exterior', n:1, name:'Exterior', effort:7, status:'pending', a:'IR', earliest:'2026-10-05', outsource:{cost:1500}});
@@ -457,7 +491,7 @@ let CALC = [
             {name:'FF Plans',eff:14},{name:'FF Elevations',eff:14},{name:'FF Technical requirements',eff:14}],
     dwgExt:[{name:'Facade (Maria)',eff:7},{name:'Landscape (Julia)',eff:7}]},
   // Jinan 5 — 120 m² apartment, already in Production
-  {id:'c-jinan5', name:'Jinan 5', budget:0, pmFee:0, designRate:115, archRate:90, currency:'USD',
+  {id:'c-jinan5', name:'Jinan 5', budget:13750, pmFee:0, designRate:115, archRate:90, currency:'USD',
     archExecutor:null, committedProjectId:'jinan5',
     floors:[{name:'Apartment', rooms:4, eff:2, executor:'OL'}],
     ext:null, outsourceExt:null,
@@ -506,7 +540,7 @@ const proj = id => PROJECTS.find(p=>p.id===id) || {id:id, name:id, prio:9, statu
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 const state = {
-  tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null,
+  tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
   sim:{name:'Tanger 2', effort:30, team:'viz', ran:true, pick:0},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
   potentials:[
@@ -545,6 +579,50 @@ function active(z){
   return z.effort;
 }
 function floorOrder(f){ return ({'Ground':1,'1 floor':1,'First':2,'2 floor':2,'Second':3,'Exterior':4,'Hall':1,'AD':5,'LS':6})[f]||9 }
+
+/* ---------- Scope: іменоване групування кімнат/пакетів на поверсі під одного виконавця ---------- */
+function initials(m){ return (m.name||'?').slice(0,2).toUpperCase() }
+function avatar(personId, cls){
+  const m = person(personId);
+  return `<span class="av ${cls||''}" style="background:${m.color}" title="${esc(m.name)}">${initials(m)}</span>`;
+}
+/* стек аватарок: 1 людина — її ава; 2 — обидві; 3+ — перша (з найбільшим обсягом) + «+N» */
+function avatarStack(people, cls){
+  if(!people.length) return '<span class="muted" style="font-size:11.5px">unassigned</span>';
+  if(people.length<=2) return `<span class="av-stack">${people.map(p=>avatar(p.id,cls)).join('')}</span>`;
+  return `<span class="av-stack">${avatar(people[0].id,cls)}<span class="av-more">+${people.length-1}</span></span>`;
+}
+/* зони поверху, згруповані по scope-мітці; зона без мітки стає власним одиночним scope — існуючі проєкти не ламаються */
+function scopesOf(floorZones){
+  const map = new Map();
+  floorZones.forEach(z=>{
+    const key = z.scope || ('__'+z.id);
+    if(!map.has(key)) map.set(key, {key, name: z.scope || z.name, zones:[]});
+    map.get(key).zones.push(z);
+  });
+  return [...map.values()].map(g=>{
+    g.zones.sort((a,b)=>a.n-b.n);
+    const assignees = [...new Set(g.zones.map(z=>z.a).filter(Boolean))];
+    const effort = g.zones.reduce((n,z)=>n+z.effort,0);
+    const left = g.zones.reduce((n,z)=>n+active(z),0);
+    const statuses = [...new Set(g.zones.map(z=>z.status))];
+    g.assignees = assignees; g.effort = effort; g.left = left;
+    g.status = statuses.length===1 ? statuses[0] : 'mixed';
+    g.single = g.zones.length===1;
+    return g;
+  }).sort((a,b)=>a.zones[0].n-b.zones[0].n);
+}
+/* хто працює на поверсі і скільки — для стеку аватарок і швидкого попапу команди */
+function floorTeam(floorZones){
+  const by = new Map();
+  floorZones.forEach(z=>{
+    if(!z.a) return;
+    if(!by.has(z.a)) by.set(z.a, {id:z.a, scopes:new Set(), effort:0, left:0});
+    const e = by.get(z.a);
+    e.scopes.add(z.scope || z.name); e.effort += z.effort; e.left += active(z);
+  });
+  return [...by.values()].sort((a,b)=>b.effort-a.effort);
+}
 
 let S;
 function build(extra=[]){
@@ -874,7 +952,14 @@ function viewProduction(){
     <div class="kpi"><div class="l">Total ${dc.unit}</div><div class="v">${b.total}</div><div class="f">${b.totalW} ${dc.role.toLowerCase()}-days planned</div></div>
     <div class="kpi"><div class="l">${state.disc==='viz'?'Design approved':'Approved'}</div><div class="v">${b.appr}</div><div class="f">${b.apprW} days of work closed</div></div>
     <div class="kpi"><div class="l">${dc.unit[0].toUpperCase()+dc.unit.slice(1)} remaining</div><div class="v">${b.remaining}</div><div class="f">${b.rev} revision · ${b.pau} paused · ${b.pen} new</div></div>
-    <div class="kpi"><div class="l">${dc.role} effort left</div><div class="v">${b.left} days</div><div class="f">${b.pauW? `+ ${b.pauW} days on hold`:'nothing on hold'}</div></div>
+    <div class="kpi"><div class="l">${dc.role} effort left</div><div class="v">${b.left} days</div>
+      <div class="effort-chips">${(()=>{
+        const by = new Map();
+        zones.forEach(z=>{ if(!z.a) return; const l=active(z); if(!l) return; by.set(z.a,(by.get(z.a)||0)+l); });
+        const rows = [...by.entries()].sort((a,b)=>b[1]-a[1]);
+        return rows.length? rows.map(([id,d])=>`<span class="ec">${avatar(id,'sm')}${d}d</span>`).join('')
+          : `<span class="muted" style="font-size:11.5px">${b.pauW? `+ ${b.pauW} days on hold`:'nothing on hold'}</span>`;
+      })()}</div></div>
     <div class="kpi"><div class="l">Forecast finish</div><div class="v">${fin?fmt(D(fin)):(b.left?'—':'Done')}</div><div class="f">${fin? 'from the team calendar' : b.left? 'no one assigned':'all approved'}</div></div>
   </div>
 
@@ -886,12 +971,31 @@ function viewProduction(){
           const fz = zones.filter(z=>z.floor===f).sort((a,b)=>a.n-b.n);
           const done = fz.filter(z=>z.status==='approved').length;
           const left = fz.reduce((n,z)=>n+active(z),0);
-          return `<div class="floor">
+          const team = floorTeam(fz);
+          const fkey = `${pr.id}|${state.disc}|${f}`;
+          const open = !!state.openFloor[fkey];
+          const scopes = scopesOf(fz);
+          return `<div class="floor" style="align-items:start">
             <div><div class="fn">${esc(f)}</div><div class="fc">${done} / ${fz.length} approved${fz.some(z=>z.outsource)?' · <span style=\"color:var(--pot-t)\">outsourced</span>':''}</div></div>
-            <div class="pills">${fz.map(z=>`<button class="pill ${z.status} ${state.selZone===z.id?'sel':''}" data-zone="${z.id}"
-                title="${esc(z.name)} · ${STATUS[z.status].lab} · ${z.effort}d${z.a?' · '+person(z.a).name:''}">${state.disc==='viz'?String(z.n).padStart(2,'0'):esc(z.name)}</button>`).join('')}
-              <button class="pill add" data-add="${esc(f)}" title="Add ${dc.unit1}">+</button></div>
+            <div>
+              <div data-floor-team="${fkey}" style="margin-bottom:7px">${avatarStack(team,'sm')}</div>
+              <div class="pills">${fz.map(z=>`<button class="pill ${z.status} ${state.selZone===z.id?'sel':''}" data-zone="${z.id}"
+                  title="${esc(z.name)} · ${STATUS[z.status].lab} · ${z.effort}d${z.a?' · '+person(z.a).name:''}">${state.disc==='viz'?String(z.n).padStart(2,'0'):esc(z.name)}</button>`).join('')}
+                <button class="pill add" data-add="${esc(f)}" title="Add ${dc.unit1}">+</button></div>
+            </div>
             <div class="left">${left? left+'d left' : '<span style="color:var(--appr-t)">done</span>'}</div>
+            <button class="floor-chev ${open?'open':''}" data-floor-toggle="${fkey}" aria-label="Expand ${esc(f)}">▸</button>
+            ${open? `<div class="scope-table" style="grid-column:1 / -1">
+              <div class="scope-head"><div>Scope / Area</div><div>${dc.unit[0].toUpperCase()+dc.unit.slice(1)}</div><div>${dc.role}</div><div>Effort</div><div>Status</div></div>
+              ${scopes.map(g=>`<div class="scope-row" data-scope-open="${fkey}|${esc(g.name)}">
+                <div><div class="sn">${esc(g.name)}</div>${!g.single?`<div class="sd">${g.zones.length} ${dc.unit}</div>`:''}</div>
+                <div class="rooms">${g.zones.map(z=>`<span>${state.disc==='viz'?String(z.n).padStart(2,'0'):esc(z.name)}</span>`).join('')}</div>
+                <div>${avatarStack(g.assignees.map(id=>({id})),'sm')}</div>
+                <div>${g.effort}d</div>
+                <div><span class="status-chip" style="background:${g.status==='mixed'?'var(--ns)':STATUS[g.status].col};color:${g.status==='mixed'?'var(--ink-2)':STATUS[g.status].ink}">${g.status==='mixed'?'Mixed':STATUS[g.status].lab}</span></div>
+              </div>`).join('')}
+              <button class="add scope-add" data-add-scope="${fkey}">+ Add scope / ${dc.role.toLowerCase()}</button>
+            </div>`:''}
           </div>`;
         }).join('') || '<div class="muted">No work in this discipline yet.</div>'}
         <div class="legend">
@@ -963,10 +1067,12 @@ function financeCard(pid){
         <div class="calc-sec-h" style="margin-bottom:2px">Financing schedule<span class="muted">${money(p.payments.reduce((n,x)=>n+x.amount,0),cur)} total</span></div>
         ${p.payments.map((pm,i)=>`<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-2)">
           <button data-pay-toggle="${p.id}|${i}" class="pill" style="${pm.paid?'background:var(--appr);color:var(--appr-t);border-color:transparent':''}">${pm.paid?'✓ Paid':'Mark paid'}</button>
-          <div style="flex:1;min-width:0"><div style="font-size:14px">${esc(pm.stage)}</div><div class="muted" style="font-size:12px">${pm.pct}% of contract</div></div>
-          <div class="money" style="font-size:15px">${money(pm.amount,cur)}</div>
+          <div style="flex:1;min-width:0"><div style="font-size:14px">${esc(pm.stage)}</div>
+            <div class="muted" style="font-size:12px">${pm.pct}% of contract${pm.date?` · ${pm.paid?'paid':'due'} ${fmt(D(pm.date))}`:''}</div></div>
+          <div class="money" style="font-size:15px;text-align:right">${money(pm.amount,cur)}${!pm.paid?`<div class="muted" style="font-size:11px;font-weight:400">outstanding</div>`:''}</div>
         </div>`).join('')}
-        <div class="muted" style="font-size:12px;margin-top:11px">${p.payments.filter(x=>x.paid).length} of ${p.payments.length} stages invoiced · ${money(p.payments.filter(x=>x.paid).reduce((n,x)=>n+x.amount,0),cur)} received so far.</div>
+        <div class="muted" style="font-size:12px;margin-top:11px">${p.payments.filter(x=>x.paid).length} of ${p.payments.length} stages invoiced · ${money(p.payments.filter(x=>x.paid).reduce((n,x)=>n+x.amount,0),cur)} received ·
+          ${money(p.payments.filter(x=>!x.paid).reduce((n,x)=>n+x.amount,0),cur)} outstanding.</div>
       </div>`:''}
 
       ${keys.length? `<div style="margin-top:20px">
@@ -1627,6 +1733,79 @@ function viewAllProjects(){
 /* ======================================================================
    ПАНЕЛЬ ЗОНИ
    ====================================================================== */
+/* ---------- Scope: попап команди поверху, картка scope, форма додавання ---------- */
+function openFloorTeam(fkey){
+  const [pid, disc, floor] = fkey.split('|');
+  const dc = DISC[disc];
+  const fz = Z.filter(z=>z.p===pid && z.d===disc && z.floor===floor);
+  const team = floorTeam(fz);
+  drawer(`<button class="x" data-close aria-label="Close">×</button>
+    <div class="muted" style="font-size:13px">${esc(proj(pid).name)} · ${dc.name}</div>
+    <h3>${esc(floor)} team (${team.length})</h3>
+    ${team.map(t=>{
+      const m = person(t.id);
+      return `<div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line-2)">
+        ${avatar(t.id,'lg')}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px">${esc(m.name)}</div>
+          <div class="muted" style="font-size:12px">${[...t.scopes].map(esc).join(', ')}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:500">${t.effort}d</div>
+          <div class="muted" style="font-size:11px">${t.left? t.left+'d left':'done'}</div>
+        </div>
+      </div>`;
+    }).join('') || '<div class="muted" style="padding:14px 0">No one assigned on this floor yet.</div>'}
+    <button class="pill" data-floor-open="${fkey}" style="margin-top:16px">See full scope breakdown →</button>`);
+}
+function openScopeDetail(fkey, scopeName){
+  const [pid, disc, floor] = fkey.split('|');
+  const dc = DISC[disc];
+  const fz = Z.filter(z=>z.p===pid && z.d===disc && z.floor===floor);
+  const g = scopesOf(fz).find(x=>x.name===scopeName);
+  if(!g) return;
+  drawer(`<button class="x" data-close aria-label="Close">×</button>
+    <div class="muted" style="font-size:13px">${esc(proj(pid).name)} · ${dc.name} · ${esc(floor)}</div>
+    <h3>${esc(g.name)}</h3>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 16px">${g.zones.length} ${dc.unit} · ${g.effort}d total ${g.left?`· ${g.left}d left`:'· done'}</p>
+    ${g.zones.map(z=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line-2);cursor:pointer" data-open-zone="${z.id}">
+      ${z.a? avatar(z.a,'sm') : '<span class="av sm" style="background:var(--ns)">?</span>'}
+      <div style="flex:1;min-width:0;font-size:13px">${esc(z.name)}</div>
+      <span class="status-chip" style="background:${STATUS[z.status].col};color:${STATUS[z.status].ink};font-size:10.5px">${STATUS[z.status].lab}</span>
+      <span style="font-size:12.5px;color:var(--ink-2);min-width:28px;text-align:right">${z.effort}d</span>
+    </div>`).join('')}
+    ${!g.single? `
+    <div class="field"><div class="fl">Reassign whole scope to</div>
+      <select data-scope-reassign="${fkey}|${esc(scopeName)}"><option value="">— choose —</option>
+        ${TEAM.filter(m=>m.team===disc).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></div>
+    <div class="field"><div class="fl">Rename scope</div>
+      <input id="scopeRename" value="${esc(g.name)}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
+      <button class="pill" data-scope-rename="${fkey}|${esc(scopeName)}" style="margin-top:9px">Save name</button></div>
+    ` : ''}
+    <button class="btn ghost" data-scope-delete="${fkey}|${esc(scopeName)}" style="margin-top:20px;width:100%">Delete ${g.single?'this '+dc.unit1:'whole scope ('+g.zones.length+' '+dc.unit+')'}</button>`);
+}
+function openAddScope(fkey){
+  const [pid, disc, floor] = fkey.split('|');
+  const dc = DISC[disc];
+  drawer(`<button class="x" data-close aria-label="Close">×</button>
+    <div class="muted" style="font-size:13px">${esc(proj(pid).name)} · ${dc.name}</div>
+    <h3>New scope · ${esc(floor)}</h3>
+    <p class="muted" style="font-size:12.5px;margin:6px 0 18px">Groups one or more ${dc.unit} under one ${dc.role.toLowerCase()} with a shared name — e.g. "Main rooms", "Bathrooms", "Kitchen".</p>
+    <div class="field"><div class="fl">Scope name</div>
+      <input id="scopeName" placeholder="e.g. Main rooms" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px"></div>
+    <div class="field"><div class="fl">Number of ${dc.unit}</div>
+      <input id="scopeRooms" type="number" min="1" value="1" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px"></div>
+    <div class="field"><div class="fl">${dc.role}</div>
+      <select id="scopeDesigner" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
+        <option value="">Not assigned</option>${TEAM.filter(m=>m.team===disc).map(m=>`<option value="${m.id}">${esc(m.name)}${m.type==='freelance'?' (outsource)':''}</option>`).join('')}</select></div>
+    <div class="field"><div class="fl">Total effort, designer-days</div>
+      <input id="scopeEffort" type="number" min="0.5" step="0.5" value="4" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px"></div>
+    <div class="field"><div class="fl">Status</div>
+      <select id="scopeStatus" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
+        ${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${k==='pending'?'selected':''}>${v.lab}</option>`).join('')}</select></div>
+    <div style="display:flex;gap:10px;margin-top:20px"><button class="pill" data-close>Cancel</button><button class="btn" data-save-scope="${fkey}">Save</button></div>`);
+}
+
 function openZone(id){
   const z = Z.find(x=>x.id===id); if(!z) return;
   state.selZone=id;
@@ -1753,6 +1932,50 @@ document.addEventListener('click', e=>{
   if(n=el('[data-person-load]')){ openLoadDetail(n.dataset.personLoad, null); return; }
   if(n=el('[data-open-zone]')){ openZone(n.dataset.openZone); return; }
   if(n=el('[data-zone]')){ openZone(n.dataset.zone); render(); openZone(n.dataset.zone); return; }
+  if(n=el('[data-floor-toggle]')){ const k=n.dataset.floorToggle; state.openFloor[k]=!state.openFloor[k]; closeDrawer(); return; }
+  if(n=el('[data-floor-open]')){ state.openFloor[n.dataset.floorOpen]=true; closeDrawer(); return; }
+  if(n=el('[data-floor-team]')){ openFloorTeam(n.dataset.floorTeam); return; }
+  if(n=el('[data-scope-open]')){ const [k,name]=n.dataset.scopeOpen.split('|'); openScopeDetail(k,name); return; }
+  if(n=el('[data-add-scope]')){ openAddScope(n.dataset.addScope); return; }
+  if(n=el('[data-save-scope]')){
+    const [pid,disc,floor] = n.dataset.saveScope.split('|');
+    const name = document.getElementById('scopeName').value.trim();
+    if(!name){ toast('Enter a scope name'); return; }
+    const rooms = Math.max(1, Math.round(+document.getElementById('scopeRooms').value||1));
+    const designer = document.getElementById('scopeDesigner').value || null;
+    const totalEffort = Math.max(0.5, +document.getElementById('scopeEffort').value||0.5);
+    const status = document.getElementById('scopeStatus').value;
+    const per = Math.round((totalEffort/rooms)*2)/2;
+    const same = Z.filter(z=>z.p===pid && z.d===disc && z.floor===floor);
+    const startN = Math.max(0,...same.map(z=>z.n))+1;
+    const before = Z.length;
+    for(let i=0;i<rooms;i++){
+      zone({p:pid, d:disc, floor, n:startN+i, name: disc==='viz'?'Room '+String(startN+i).padStart(2,'0'):name+(rooms>1?' '+(i+1):''),
+        effort:per, status, a:designer, scope:name, outsource:outsourceFor(designer)});
+    }
+    Z.slice(before).forEach(dbSaveZone);
+    S=build(); closeDrawer();
+    state.openFloor[`${pid}|${disc}|${floor}`]=true;
+    render(); toast(`${name}: ${rooms} ${DISC[disc].unit} · ${totalEffort}d`); return;
+  }
+  if(n=el('[data-scope-rename]')){
+    const [pid,disc,floor,name] = n.dataset.scopeRename.split('|');
+    const newName = document.getElementById('scopeRename').value.trim(); if(!newName) return;
+    const fz = Z.filter(z=>z.p===pid && z.d===disc && z.floor===floor);
+    const g = scopesOf(fz).find(x=>x.name===name); if(!g) return;
+    g.zones.forEach(z=>{ z.scope=newName; dbSaveZone(z); });
+    render(); openScopeDetail(`${pid}|${disc}|${floor}`, newName);
+    toast(`Renamed to ${newName}`); return;
+  }
+  if(n=el('[data-scope-delete]')){
+    const [pid,disc,floor,name] = n.dataset.scopeDelete.split('|');
+    const fz = Z.filter(z=>z.p===pid && z.d===disc && z.floor===floor);
+    const g = scopesOf(fz).find(x=>x.name===name); if(!g) return;
+    g.zones.forEach(z=>dbDeleteZone(z.id));
+    const ids = new Set(g.zones.map(z=>z.id));
+    Z = Z.filter(z=>!ids.has(z.id));
+    S=build(); closeDrawer(); render(); toast(`${name} removed · ${g.zones.length} ${DISC[disc].unit}`); return;
+  }
   if(n=el('[data-add]')){
     const f=n.dataset.add, same=Z.filter(z=>z.p===state.project&&z.d===state.disc&&z.floor===f);
     const tmpl=same[same.length-1]||{effort:2,a:null};
@@ -1886,6 +2109,15 @@ document.addEventListener('click', e=>{
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
   if(t.id==='projSel'){ state.project=t.value; render(); return; }
+  if(t.dataset.scopeReassign!==undefined){
+    const [pid,disc,floor,name] = t.dataset.scopeReassign.split('|');
+    const who = t.value || null;
+    const fz = Z.filter(x=>x.p===pid && x.d===disc && x.floor===floor);
+    const g = scopesOf(fz).find(x=>x.name===name); if(!g) return;
+    g.zones.forEach(z=>{ z.a=who; if(!who) z.outsource=null; else if(isFreelance(who) && !z.outsource) z.outsource={cost:0}; dbSaveZone(z); });
+    S=build(); render();
+    toast(`${name} → ${who?person(who).name:'not assigned'} · ${g.zones.length} ${DISC[disc].unit}`); return;
+  }
   if(z && t.dataset.assign!==undefined){ z.a=t.value||null; if(!z.a) z.outsource=null; else if(isFreelance(z.a) && !z.outsource) z.outsource={cost:0}; changed(`${z.name}: ${z.a?person(z.a).name:'not assigned'}`); return; }
   if(z && t.dataset.reason!==undefined){ z.reason=t.value; changed(`${z.name}: ${z.reason}`); return; }
   if(z && t.dataset.outfee!==undefined){ if(!z.outsource) z.outsource={cost:0}; z.outsource.cost=Math.max(0,+t.value||0); changed(`${z.name}: outsourced · ${money(z.outsource.cost)}`); return; }
