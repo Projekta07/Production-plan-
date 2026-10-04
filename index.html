@@ -338,7 +338,8 @@ function toDbZone(z){
   return {
     id:z.id, project_id:z.p, discipline:z.d, floor:z.floor??null, n:z.n, name:z.name,
     effort:z.effort, rev_effort:z.revEffort??1, status:z.status, assignee_id:z.a??null,
-    earliest:z.earliest, reason:z.reason??null,
+    earliest:z.earliest, reason:z.reason??null, scope:z.scope??null,
+    v1_delivered: z.v1Delivered??null, revision_note: z.revisionNote??null,
     outsource_cost: z.outsource? z.outsource.cost : null,
     after_project_id: z.after? z.after.p : null,
     after_floor: z.after? z.after.floor : null,
@@ -350,7 +351,8 @@ function fromDbZone(r){
   return {
     id:r.id, p:r.project_id, d:r.discipline, floor:r.floor, n:r.n, name:r.name,
     effort:Number(r.effort), revEffort:Number(r.rev_effort), status:r.status, a:r.assignee_id,
-    earliest:r.earliest, reason:r.reason,
+    earliest:r.earliest, reason:r.reason, scope:r.scope??undefined,
+    v1Delivered:r.v1_delivered??undefined, revisionNote:r.revision_note??undefined,
     outsource: r.outsource_cost!=null? {cost:Number(r.outsource_cost)} : undefined,
     after: r.after_project_id? {p:r.after_project_id, floor:r.after_floor, lag:r.after_lag} : undefined,
   };
@@ -1502,12 +1504,12 @@ function applyQuickSetup(pid, disc, floor, targetRooms, targetDays){
 function roomsTable(pr, disc, zones, floors){
   const dc = DISC[disc];
   return `<div class="tlm-wrap"><table class="tlm">
-    <thead><tr><th>Floor / ${dc.unit1[0].toUpperCase()+dc.unit1.slice(1)}</th><th class="num">Effort</th><th>${dc.role}</th><th>Status</th><th>Scheduled</th><th></th></tr></thead>
+    <thead><tr><th>Floor / ${dc.unit1[0].toUpperCase()+dc.unit1.slice(1)}</th><th class="num">Effort</th><th>${dc.role}</th><th>Status</th><th>Revision note</th><th>Scheduled</th><th></th></tr></thead>
     <tbody>
       ${floors.map(f=>{
         const fz = zones.filter(z=>z.floor===f).sort((a,b)=>a.n-b.n);
         const totalEffort = fz.reduce((n,z)=>n+z.effort,0);
-        return `<tr class="role-row"><td colspan="6">${esc(f)} · ${fz.length} ${dc.unit} · ${totalEffort}d total</td></tr>
+        return `<tr class="role-row"><td colspan="7">${esc(f)} · ${fz.length} ${dc.unit} · ${totalEffort}d total</td></tr>
           ${fz.map(z=>{
             const it = S.byId.get(z.id);
             return `<tr>
@@ -1517,12 +1519,15 @@ function roomsTable(pr, disc, zones, floors){
                 <option value="">—</option>${TEAM.filter(m=>m.team===disc).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></td>
               <td style="text-align:left"><select data-tbl-status="${z.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px">
                 ${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${z.status===k?'selected':''}>${v.lab}</option>`).join('')}</select></td>
+              <td style="text-align:left">${z.status==='revision'
+                ? `<input data-tbl-revnote="${z.id}" value="${esc(z.revisionNote||'')}" placeholder="what needs fixing" style="width:100%;min-width:130px;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 7px;font-size:12px">`
+                : `<span class="muted">—</span>`}</td>
               <td style="text-align:left;font-size:11.5px;white-space:nowrap;cursor:pointer;color:var(--ink-2);text-decoration:underline dotted" data-resched="${z.id}" title="Click to change the date or duration">${it&&it.s? fmt(D(it.s))+' – '+fmt(D(it.e)) : (z.status==='approved'?'done':'—')}</td>
               <td><button data-tbl-remove="${z.id}" title="Remove" style="border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1">×</button></td>
             </tr>`;
           }).join('')}
-          <tr><td colspan="6" style="text-align:left"><button class="add" data-add="${esc(f)}" style="font-size:12px">+ Add ${dc.unit1}</button></td></tr>`;
-      }).join('') || `<tr><td colspan="6" class="muted" style="text-align:left;padding:16px 0">No floors yet — use Quick setup above to add the first one.</td></tr>`}
+          <tr><td colspan="7" style="text-align:left"><button class="add" data-add="${esc(f)}" style="font-size:12px">+ Add ${dc.unit1}</button></td></tr>`;
+      }).join('') || `<tr><td colspan="7" class="muted" style="text-align:left;padding:16px 0">No floors yet — use Quick setup above to add the first one.</td></tr>`}
     </tbody>
   </table></div>`;
 }
@@ -2554,12 +2559,19 @@ function openZone(id){
     <div class="field"><div class="fl">First version effort</div>
       <div class="stepper"><button data-eff="-0.5">−</button><span>${z.effort} d</span><button data-eff="0.5">+</button></div></div>
 
-    ${z.status==='revision'?`<div class="field"><div class="fl">Revision effort</div>
-      <div class="stepper"><button data-rev="-0.5">−</button><span>${z.revEffort} d</span><button data-rev="0.5">+</button></div></div>`:''}
+    <div class="field"><div class="fl">First version delivered</div>
+      <input type="date" data-v1delivered value="${z.v1Delivered||''}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
+      <div class="muted" style="font-size:12px;margin-top:7px">Set once you actually hand this version to the client — not tracked automatically, leave empty until then.</div></div>
 
-    <div class="field"><div class="fl">Not before (earliest start)</div>
+    ${z.status==='revision'?`<div class="field"><div class="fl">Revision effort</div>
+      <div class="stepper"><button data-rev="-0.5">−</button><span>${z.revEffort} d</span><button data-rev="0.5">+</button></div></div>
+
+    <div class="field"><div class="fl">What needs fixing</div>
+      <textarea data-revnote rows="3" placeholder="e.g. lighter wood tone, move the pendant light left" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px;font:inherit;font-size:13.5px;resize:vertical">${esc(z.revisionNote||'')}</textarea></div>`:''}
+
+    <div class="field"><div class="fl">${z.status==='revision'?'Revision':'First version'} — not before</div>
       <input type="date" data-earliest value="${z.earliest}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
-      <div class="muted" style="font-size:12px;margin-top:7px">${s&&s.s? `Currently scheduled ${fmt(D(s.s))} – ${fmt(D(s.e))}. Moving this later pushes anything waiting on it too.` : 'Moves when the team actually gets to it — everything downstream follows automatically.'}</div></div>
+      <div class="muted" style="font-size:12px;margin-top:7px">${s&&s.s? `${z.status==='revision'?'Revision':'First version'} currently scheduled ${fmt(D(s.s))} – ${fmt(D(s.e))}. Moving this later pushes anything waiting on it too.` : 'Moves when the team actually gets to it — everything downstream follows automatically.'}</div></div>
 
     <div class="field"><div class="fl">${dc.role}</div>
       <select data-assign><option value="">Not assigned</option>
@@ -2913,6 +2925,10 @@ document.addEventListener('change', e=>{
   if(t.dataset.simFloorName!==undefined){ state.sim.floors[+t.dataset.simFloorName].name=t.value.trim()||'Floor'; render(); return; }
   if(t.dataset.simFloorRooms!==undefined){ state.sim.floors[+t.dataset.simFloorRooms].rooms=Math.max(1,Math.round(+t.value||1)); render(); return; }
   if(t.dataset.simFloorDays!==undefined){ state.sim.floors[+t.dataset.simFloorDays].days=Math.max(0.5,+t.value||0.5); render(); return; }
+  if(t.dataset.tblRevnote!==undefined){
+    const zz=Z.find(x=>x.id===t.dataset.tblRevnote); if(!zz) return;
+    zz.revisionNote=t.value; dbSaveZone(zz); return;
+  }
   if(t.dataset.tblRename!==undefined){
     const zz=Z.find(x=>x.id===t.dataset.tblRename); if(!zz) return;
     const newName=t.value.trim(); if(!newName){ t.value=zz.name; return; }
@@ -2968,6 +2984,8 @@ document.addEventListener('change', e=>{
   if(z && t.dataset.rename!==undefined){ const newName=t.value.trim(); if(!newName){ t.value=z.name; return; } z.name=newName; changed(`Renamed to ${z.name}`); return; }
   if(z && t.dataset.reason!==undefined){ z.reason=t.value; changed(`${z.name}: ${z.reason}`); return; }
   if(z && t.dataset.earliest!==undefined){ if(!t.value) return; z.earliest=t.value; changed(`${z.name}: nothing before ${fmt(D(z.earliest))}`); return; }
+  if(z && t.dataset.v1delivered!==undefined){ z.v1Delivered=t.value||null; changed(z.v1Delivered?`First version marked delivered ${fmt(D(z.v1Delivered))}`:'First-version delivery date cleared'); return; }
+  if(z && t.dataset.revnote!==undefined){ z.revisionNote=t.value; dbSaveZone(z); render(); return; }
   if(z && t.dataset.outfee!==undefined){ if(!z.outsource) z.outsource={cost:0}; z.outsource.cost=Math.max(0,+t.value||0); changed(`${z.name}: outsourced · ${money(z.outsource.cost)}`); return; }
   if(t.dataset.teamName!==undefined){ const m=person(t.dataset.teamName); m.name=t.value.trim()||m.name; dbSaveTeam(m); render(); return; }
   if(t.dataset.teamRole!==undefined){ const m=person(t.dataset.teamRole); m.team=t.value; dbSaveTeam(m); S=build(); render(); return; }
