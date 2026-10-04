@@ -565,8 +565,8 @@ const state = {
   tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
   ganttDisc:'all', ganttOpen:{}, ganttZoom:'week', quickSetupOpen:false, roomsView:'dashboard',
   calSubview:'fit', teamCalPerson:null, teamCalMonthOffset:0, teamCalSelDay:null, scheduleIssues:[],
-  planView:'gantt', projCalMonthOffset:0, projCalSelDay:null,
-  sim:{name:'Tanger 2', effort:30, team:'viz', ran:true, pick:0},
+  planView:'gantt', planProject:null, projCalMonthOffset:0, projCalSelDay:null, projCalDisc:'all',
+  sim:{name:'Tanger 2', team:'viz', ran:false, pick:0, floors:[{name:'Ground', rooms:6, days:2},{name:'First', rooms:8, days:2}]},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
   potentials:[
     {id:'p1', name:'Tanger 2',  effort:30, team:'viz', revenue:26000, on:false},
@@ -1173,19 +1173,106 @@ function ganttSection(projectId, {embedded=false}={}){
   ${projectTeamCard(pr.id, discFilter, r, cols, zoom)}`;
 }
 
-/* ---------- Project calendar: та сама ідея, що Team calendar, але скопом по проєкту — всі люди, що того дня на ньому працюють ---------- */
-function dayTasksForProject(projectId, day){
+/* ---------- Усі проєкти разом: той самий Гант і той самий календар, просто з рівнем "проєкт" зверху ---------- */
+function ganttSectionAll(){
+  const discFilter = state.ganttDisc, zoom = state.ganttZoom;
+  const confirmedProjects = PROJECTS.filter(p=>p.status==='confirmed' && Z.some(z=>z.p===p.id)).sort((a,b)=>a.prio-b.prio);
+  const allZones = Z.filter(z=>confirmedProjects.some(p=>p.id===z.p) && (discFilter==='all'||z.d===discFilter));
+  const sp = spanOfZones(allZones);
+  const start = sp? new Date(Math.min(sp.s, TODAY)) : TODAY;
+  const end = sp? sp.e : addDays(TODAY,30);
+  const r = zoom==='month'
+    ? {start:new Date(start.getFullYear(),start.getMonth(),1), end:new Date(end.getFullYear(),end.getMonth()+1,0)}
+    : {start:monday(start), end:addDays(monday(end),6)};
+  const cols = ganttCols(r, zoom);
+
+  const rows = [];
+  confirmedProjects.forEach(pr=>{
+    const pz = Z.filter(z=>z.p===pr.id && (discFilter==='all'||z.d===discFilter));
+    if(!pz.length) return;
+    const pkey = `__proj__${pr.id}`;
+    rows.push({kind:'project', pkey, label:pr.name, effort:pz.reduce((n,z)=>n+z.effort,0), team:floorTeam(pz), span:spanOfZones(pz), zones:pz});
+    if(!state.ganttOpen[pkey]) return;
+    const discs = discFilter==='all' ? Object.keys(DISC).filter(d=>pz.some(z=>z.d===d)) : [discFilter];
+    discs.forEach(d=>{
+      const dz = pz.filter(z=>z.d===d);
+      if(!dz.length) return;
+      rows.push({kind:'group', label:`${pr.name} · ${DISC[d].name}`, effort:dz.reduce((n,z)=>n+z.effort,0), span:spanOfZones(dz), zones:dz});
+      const floors = [...new Set(dz.map(z=>z.floor))].sort((a,b)=>floorOrder(a)-floorOrder(b));
+      floors.forEach(f=>{
+        const fz = dz.filter(z=>z.floor===f);
+        const fkey = `${pr.id}|${d}|${f}`;
+        rows.push({kind:'floor', disc:d, floor:f, fkey, label:f, team:floorTeam(fz), effort:fz.reduce((n,z)=>n+z.effort,0), span:spanOfZones(fz), zones:fz});
+        if(state.ganttOpen[fkey]){
+          scopesOf(fz).forEach(g=>{
+            rows.push({kind:'scope', fkey, label:g.name, team:g.assignees.map(id=>({id})), effort:g.effort, span:spanOfZones(g.zones),
+              single:g.single, zoneId:g.single?g.zones[0].id:null, zones:g.zones});
+          });
+        }
+      });
+    });
+  });
+
+  return `<section class="card gantt-compact">
+    <div class="card-h">
+      <h2>All projects</h2><span class="hint">click ▸ to open a project, then its floors</span>
+      <div class="spacer"></div>
+      <div class="seg">${['day','week','month'].map(z=>`<button data-gantt-zoom="${z}" aria-pressed="${zoom===z}">${z[0].toUpperCase()+z.slice(1)}</button>`).join('')}</div>
+      <div class="seg"><button data-gantt-disc="all" aria-pressed="${discFilter==='all'}">All</button>
+        ${Object.entries(DISC).map(([k,v])=>`<button data-gantt-disc="${k}" aria-pressed="${discFilter===k}">${v.short}</button>`).join('')}</div>
+    </div>
+    <div class="card-b" style="padding:0">
+      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:200px;min-width:${Math.max(700,cols.length*(zoom==='day'?26:zoom==='week'?56:84))}px">
+        ${ganttHead(cols)}
+        ${rows.length? rows.map(row=>{
+          if(row.kind==='project'){
+            const open = !!state.ganttOpen[row.pkey];
+            return `<div class="tl-row gantt-row" style="background:var(--line-2);border-bottom:1px solid var(--line)">
+              <div class="tl-lab" style="display:flex;align-items:center;gap:6px">
+                <button class="floor-chev ${open?'open':''}" data-gantt-toggle="${row.pkey}" aria-label="Expand ${esc(row.label)}">▸</button>
+                <div style="min-width:0"><b style="font-size:12.5px">${esc(row.label)}</b>${avatarStack(row.team,'sm')}
+                  <small style="display:block">${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:' · not scheduled'}</small></div></div>
+              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:'var(--ink-2)',cls:'dim',text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
+                : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+          }
+          if(row.kind==='group'){
+            return `<div class="tl-row gantt-row child" style="background:var(--line-2)">
+              <div class="tl-lab" style="padding-left:20px"><b style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-2)">${esc(row.label)}</b>
+                <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
+              <div class="track">${ganttGrid(r,cols)}${ganttBar(row.span,r,{cls:'dim',bg:'var(--ink-2)',text:row.effort+'d', sub:row.span?`${fmt(row.span.s)} – ${fmt(row.span.e)}`:'', top:6})}</div></div>`;
+          }
+          if(row.kind==='floor'){
+            const open = !!state.ganttOpen[row.fkey];
+            return `<div class="tl-row gantt-row"><div class="tl-lab" style="display:flex;align-items:center;gap:6px;padding-left:20px">
+                <button class="floor-chev ${open?'open':''}" data-gantt-toggle="${row.fkey}" aria-label="Expand ${esc(row.floor)}">▸</button>
+                <div style="min-width:0;overflow:hidden"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
+                  <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div></div>
+              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(inProgressTag(row.span)?'In progress · ':'')+(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
+                : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+          }
+          return `<div class="tl-row gantt-row child" style="cursor:pointer" ${row.single?`data-resched="${row.zoneId}"`:`data-scope-open="${row.fkey}|${esc(row.label)}"`}>
+            <div class="tl-lab" style="padding-left:40px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
+              <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
+            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), text:(inProgressTag(row.span)?'In progress · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+        }).join('') : '<div class="muted" style="padding:20px 18px">No confirmed work yet.</div>'}
+      </div></div>
+    </div>
+  </section>`;
+}
+function dayTasksForStudio(day, discFilter){
   const key = iso(day), out=[];
   TEAM.forEach(m=>{
     const occ = S.occ[m.id]; if(!occ) return;
     const zid = occ.get(key); if(!zid) return;
-    const z = Z.find(x=>x.id===zid); if(!z || z.p!==projectId) return;
+    const z = Z.find(x=>x.id===zid); if(!z || proj(z.p).status!=='confirmed') return;
+    if(discFilter && discFilter!=='all' && z.d!==discFilter) return;
     const it = S.byId.get(zid), idx = it.days.indexOf(key);
     out.push({z, person:m, idx:idx+1, total:it.days.length});
   });
   return out;
 }
-function projectCalendarView(pr){
+function allProjectsCalendarView(){
+  const discFilter = state.projCalDisc||'all';
   const off = state.projCalMonthOffset||0;
   const base = new Date(TODAY.getFullYear(), TODAY.getMonth()+off, 1);
   const y=base.getFullYear(), mo=base.getMonth();
@@ -1193,14 +1280,95 @@ function projectCalendarView(pr){
   const monthLabel = base.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const dow = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const selDay = state.projCalSelDay;
-  const selTasks = selDay ? dayTasksForProject(pr.id, D(selDay)) : [];
+  const selTasks = selDay ? dayTasksForStudio(D(selDay), discFilter) : [];
   return `
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
     <button class="pill" data-projcal-shift="-1">‹</button>
     <span style="font-weight:500;min-width:140px">${monthLabel}</span>
     <button class="pill" data-projcal-shift="1">›</button>
     <button class="pill" data-projcal-shift="0">Today</button>
-    <span style="margin-left:8px;display:flex;gap:14px;align-items:center">
+    <div class="seg" style="margin-left:4px">
+      <button data-projcal-disc="all" aria-pressed="${discFilter==='all'}">All</button>
+      <button data-projcal-disc="viz" aria-pressed="${discFilter==='viz'}">3D</button>
+      <button data-projcal-disc="wd" aria-pressed="${discFilter==='wd'}">Drawings</button>
+    </div>
+  </div>
+  <div class="grid2" style="grid-template-columns:1fr 300px">
+    <section class="card">
+      <div class="card-b" style="padding:14px">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px">
+          ${dow.map(d=>`<div class="muted" style="font-size:10.5px;text-align:center">${d}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+          ${days.map(d=>{
+            const inMonth = d.getMonth()===mo;
+            const tasks = dayTasksForStudio(d, discFilter);
+            const isToday = iso(d)===iso(TODAY);
+            const sel = selDay===iso(d);
+            return `<div data-projcal-day="${iso(d)}" style="min-height:${tasks.length>1?(96+(tasks.length-2)*22):74}px;border-radius:10px;padding:6px;cursor:pointer;background:${sel?'var(--line-2)':'transparent'};border:1.5px solid ${isToday?'var(--ink-2)':'transparent'};opacity:${inMonth?1:.32}">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${d.getDate()}</div>
+              ${tasks.map(t=>`<div style="background:var(--${t.z.d});border-radius:7px;padding:4px 6px;line-height:1.25;margin-bottom:3px;overflow:hidden">
+                  <div style="font-size:10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj(t.z.p).name)}</div>
+                  <div style="font-size:9px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.z.scope||t.z.name)} · ${esc(t.person.name)}</div>
+                </div>`).join('')}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>${selDay? fmt(D(selDay)) : 'Pick a day'}</h2></div>
+      <div class="card-b">
+        ${!selDay? `<div class="muted" style="font-size:13px">Click any day to see what's running studio-wide.</div>`
+          : !selTasks.length? `<div class="muted" style="font-size:13px">Nothing scheduled this day.</div>`
+          : selTasks.map(t=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line-2);cursor:pointer" data-open-zone="${t.z.id}">
+              ${avatar(t.person.id,'sm')}
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px">${esc(proj(t.z.p).name)} · ${esc(t.z.scope||t.z.name)}</div>
+                <div class="muted" style="font-size:12px">${DISC[t.z.d].name} · ${esc(t.z.floor)} · day ${t.idx} of ${t.total}</div>
+              </div>
+            </div>`).join('')}
+      </div>
+    </section>
+  </div>
+  <p class="muted" style="font-size:11.5px;margin-top:12px">Every confirmed project, same schedule as everywhere else.</p>`;
+}
+
+/* ---------- Project calendar: та сама ідея, що Team calendar, але скопом по проєкту — всі люди, що того дня на ньому працюють ---------- */
+function dayTasksForProject(projectId, day, discFilter){
+  const key = iso(day), out=[];
+  TEAM.forEach(m=>{
+    const occ = S.occ[m.id]; if(!occ) return;
+    const zid = occ.get(key); if(!zid) return;
+    const z = Z.find(x=>x.id===zid); if(!z || z.p!==projectId) return;
+    if(discFilter && discFilter!=='all' && z.d!==discFilter) return;
+    const it = S.byId.get(zid), idx = it.days.indexOf(key);
+    out.push({z, person:m, idx:idx+1, total:it.days.length});
+  });
+  return out;
+}
+function projectCalendarView(pr){
+  const discFilter = state.projCalDisc||'all';
+  const off = state.projCalMonthOffset||0;
+  const base = new Date(TODAY.getFullYear(), TODAY.getMonth()+off, 1);
+  const y=base.getFullYear(), mo=base.getMonth();
+  const days = monthGridDays(y, mo);
+  const monthLabel = base.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  const dow = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const selDay = state.projCalSelDay;
+  const selTasks = selDay ? dayTasksForProject(pr.id, D(selDay), discFilter) : [];
+  return `
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+    <button class="pill" data-projcal-shift="-1">‹</button>
+    <span style="font-weight:500;min-width:140px">${monthLabel}</span>
+    <button class="pill" data-projcal-shift="1">›</button>
+    <button class="pill" data-projcal-shift="0">Today</button>
+    <div class="seg" style="margin-left:4px">
+      <button data-projcal-disc="all" aria-pressed="${discFilter==='all'}">All</button>
+      <button data-projcal-disc="viz" aria-pressed="${discFilter==='viz'}">3D</button>
+      <button data-projcal-disc="wd" aria-pressed="${discFilter==='wd'}">Drawings</button>
+    </div>
+    <span style="display:flex;gap:14px;align-items:center">
       <span style="font-size:11.5px;color:var(--ink-2)"><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--viz);margin-right:5px"></i>${DISC.viz.name}</span>
       <span style="font-size:11.5px;color:var(--ink-2)"><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--wd);margin-right:5px"></i>${DISC.wd.name}</span>
     </span>
@@ -1214,7 +1382,7 @@ function projectCalendarView(pr){
         <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
           ${days.map(d=>{
             const inMonth = d.getMonth()===mo;
-            const tasks = dayTasksForProject(pr.id, d);
+            const tasks = dayTasksForProject(pr.id, d, discFilter);
             const isToday = iso(d)===iso(TODAY);
             const sel = selDay===iso(d);
             return `<div data-projcal-day="${iso(d)}" style="min-height:${tasks.length>1?'96px':'74px'};border-radius:10px;padding:6px;cursor:pointer;background:${sel?'var(--line-2)':'transparent'};border:1.5px solid ${isToday?'var(--ink-2)':'transparent'};opacity:${inMonth?1:.32}">
@@ -1247,18 +1415,25 @@ function projectCalendarView(pr){
 }
 
 function viewGanttPlan(){
-  const pr = proj(state.project);
   const projects = PROJECTS.filter(p=>Z.some(z=>z.p===p.id));
+  const selId = state.planProject || state.project;
+  const isAll = selId==='__all__';
+  const pr = isAll ? null : proj(selId);
   const mode = state.planView||'gantt';
   return `
   <div class="head">
-    <h1>${esc(pr.name)} · Production Plan</h1>
+    <h1>${isAll?'All projects':esc(pr.name)} · Production Plan</h1>
     <div class="spacer"></div>
     <div class="seg"><button data-plan-view="gantt" aria-pressed="${mode==='gantt'}">Gantt</button><button data-plan-view="calendar" aria-pressed="${mode==='calendar'}">Calendar</button></div>
-    <select class="sel" id="ganttProjSel">${projects.map(p=>`<option value="${p.id}" ${p.id===pr.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+    <select class="sel" id="ganttProjSel">
+      <option value="__all__" ${isAll?'selected':''}>All projects</option>
+      ${projects.map(p=>`<option value="${p.id}" ${!isAll&&p.id===selId?'selected':''}>${esc(p.name)}</option>`).join('')}
+    </select>
   </div>
-  ${mode==='calendar'? projectCalendarView(pr) : `${ganttSection(pr.id)}
-  <p class="muted" style="font-size:11.5px;margin-top:12px">One project at a time for now — switch projects with the selector above. A combined view across every project can follow once this logic feels right.</p>`}`;
+  ${isAll
+    ? (mode==='calendar'? allProjectsCalendarView() : ganttSectionAll())
+    : (mode==='calendar'? projectCalendarView(pr) : `${ganttSection(pr.id)}
+       <p class="muted" style="font-size:11.5px;margin-top:12px">Switch projects with the selector above, or pick "All projects" to see everything at once.</p>`)}`;
 }
 
 /* ======================================================================
@@ -1342,7 +1517,7 @@ function roomsTable(pr, disc, zones, floors){
                 <option value="">—</option>${TEAM.filter(m=>m.team===disc).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></td>
               <td style="text-align:left"><select data-tbl-status="${z.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px">
                 ${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${z.status===k?'selected':''}>${v.lab}</option>`).join('')}</select></td>
-              <td class="muted" style="text-align:left;font-size:11.5px;white-space:nowrap">${it&&it.s? fmt(D(it.s))+' – '+fmt(D(it.e)) : (z.status==='approved'?'done':'—')}</td>
+              <td style="text-align:left;font-size:11.5px;white-space:nowrap;cursor:pointer;color:var(--ink-2);text-decoration:underline dotted" data-resched="${z.id}" title="Click to change the date or duration">${it&&it.s? fmt(D(it.s))+' – '+fmt(D(it.e)) : (z.status==='approved'?'done':'—')}</td>
               <td><button data-tbl-remove="${z.id}" title="Remove" style="border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1">×</button></td>
             </tr>`;
           }).join('')}
@@ -1751,7 +1926,8 @@ function viewLoad(){
    ====================================================================== */
 function viewPotential(){
   const sm = state.sim, r = range();
-  const opts = sm.ran ? scenarios(+sm.effort||0, sm.team) : [];
+  const totalEffort = sm.floors.reduce((n,f)=>n+f.rooms*f.days,0);
+  const opts = sm.ran ? scenarios(totalEffort, sm.team) : [];
   const pick = opts[Math.min(sm.pick, opts.length-1)];
   const beyond = pick && D(pick.r.finish) > r.end;
   const extraOcc = {};
@@ -1762,14 +1938,28 @@ function viewPotential(){
   return `
   <div class="head"><h1>Potential project simulator</h1></div>
   <section class="card" style="margin-bottom:16px">
-    <div class="card-h"><h2>Add project without changing the real plan</h2><span class="hint">simulation</span></div>
+    <div class="card-h"><h2>Add project without changing the real plan</h2><span class="hint">same rooms-per-floor setup as Quick setup — the total effort is computed, not typed in</span></div>
     <div class="card-b">
       <div class="form">
         <div><label for="simName">Project</label><input id="simName" value="${esc(sm.name)}"></div>
-        <div><label for="simEff">Required effort, days</label><input id="simEff" type="number" min="1" value="${sm.effort}"></div>
-        <div><label for="simTeam">Team</label><select id="simTeam">
+        <div><label for="simTeam">Discipline</label><select id="simTeam">
           <option value="viz" ${sm.team==='viz'?'selected':''}>Designers</option>
           <option value="wd" ${sm.team==='wd'?'selected':''}>Architects</option></select></div>
+      </div>
+
+      <div style="margin-top:16px">
+        ${sm.floors.map((f,i)=>`<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-2)">
+          <input data-sim-floor-name="${i}" value="${esc(f.name)}" style="flex:1;min-width:110px;border:1px solid var(--line);background:var(--line-2);border-radius:7px;padding:6px 9px;font-size:13px">
+          <label class="muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px">Rooms<input type="number" min="1" value="${f.rooms}" data-sim-floor-rooms="${i}" style="width:52px;border:1px solid var(--line);background:var(--line-2);border-radius:7px;padding:5px 7px"></label>
+          <label class="muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px">Days/room<input type="number" min="0.5" step="0.5" value="${f.days}" data-sim-floor-days="${i}" style="width:52px;border:1px solid var(--line);background:var(--line-2);border-radius:7px;padding:5px 7px"></label>
+          <span class="muted" style="font-size:12px;min-width:48px">${f.rooms*f.days}d</span>
+          <button data-sim-floor-remove="${i}" style="border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer">×</button>
+        </div>`).join('')}
+        <button class="add" data-sim-floor-add style="margin-top:10px">+ Add floor</button>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+        <span style="font-size:14px">Total required effort: <b>${totalEffort}d</b></span>
         <button class="btn" data-simulate>Simulate</button>
       </div>
 
@@ -1782,7 +1972,7 @@ function viewPotential(){
           </div></div>
         <div class="tl-row" style="border:0">
           <div class="tl-lab">Potential</div>
-          <div class="track">${grid()}${bar(pick.r.start, pick.r.finish, {cls:'pot', text:`${esc(sm.name)} · ${sm.effort} ${DISC[sm.team].role.toLowerCase()}-days`})}</div></div>
+          <div class="track">${grid()}${bar(pick.r.start, pick.r.finish, {cls:'pot', text:`${esc(sm.name)} · ${totalEffort} ${DISC[sm.team].role.toLowerCase()}-days`})}</div></div>
       </div>
       <div class="opts">${opts.map((o,i)=>`<button class="opt" data-pick="${i}" aria-pressed="${o===pick}">
           <div class="t">${o.title}</div><div class="d">${fmt(D(o.r.start))} → ${fmt(D(o.r.finish))}</div>
@@ -1891,7 +2081,9 @@ function teamCalendarView(){
 
 function viewCalendar(){
   const sub = state.calSubview||'fit';
-  return `<div class="head"><h1>Resource calendar</h1><div class="spacer"></div>
+  return `<div class="head"><h1>Resource calendar</h1>
+    <span class="hint" style="max-width:420px">${sub==='fit'? "check where a not-yet-confirmed project would fit before you commit to it" : "see any one person's real day-by-day schedule, pulled from the same plan"}</span>
+    <div class="spacer"></div>
     <div class="seg"><button data-cal-subview="fit" aria-pressed="${sub==='fit'}">Fit finder</button><button data-cal-subview="calendar" aria-pressed="${sub==='calendar'}">Team calendar</button></div>
   </div>
   ${sub==='calendar'? teamCalendarView() : viewFitFinder()}`;
@@ -2518,6 +2710,7 @@ document.addEventListener('click', e=>{
     state.projCalSelDay=null; render(); return;
   }
   if(n=el('[data-projcal-day]')){ state.projCalSelDay = n.dataset.projcalDay; render(); return; }
+  if(n=el('[data-projcal-disc]')){ state.projCalDisc=n.dataset.projcalDisc; render(); return; }
   if(n=el('[data-resched-apply]')){
     const id = n.dataset.reschedApply, zz = Z.find(x=>x.id===id); if(!zz) return;
     const newStart = document.getElementById('reschedStart').value;
@@ -2598,10 +2791,11 @@ document.addEventListener('click', e=>{
 
   if(el('[data-simulate]')){
     state.sim.name=document.getElementById('simName').value.trim()||'New project';
-    state.sim.effort=Math.max(1,+document.getElementById('simEff').value||1);
     state.sim.team=document.getElementById('simTeam').value;
     state.sim.ran=true; state.sim.pick=0; render(); return;
   }
+  if(n=el('[data-sim-floor-add]')){ state.sim.floors.push({name:'New floor', rooms:4, days:2}); render(); return; }
+  if(n=el('[data-sim-floor-remove]')){ state.sim.floors.splice(+n.dataset.simFloorRemove,1); render(); return; }
   if(n=el('[data-pick]')){ state.sim.pick=+n.dataset.pick; render(); return; }
   if(el('[data-calrun]')){
     state.cal.name=document.getElementById('calName').value.trim()||'New project';
@@ -2693,22 +2887,32 @@ document.addEventListener('click', e=>{
     return;
   }
   if(el('[data-confirm]')){
-    const sm=state.sim, o=scenarios(+sm.effort, sm.team)[sm.pick]; if(!o) return;
+    const sm=state.sim, totalEffort=sm.floors.reduce((n,f)=>n+f.rooms*f.days,0);
+    const o=scenarios(totalEffort, sm.team)[sm.pick]; if(!o) return;
     const id=sm.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+Date.now()%1000;
-    PROJECTS.push({id, name:sm.name, prio:9, status:'confirmed'});
+    const primary = o.r.ids[0]; // при парі обох людей рушій усе одно розведе по черзі — кімнати стартують від одного найранішого дня
+    PROJECTS.push({id, name:sm.name, prio:9, status:'confirmed', revenue:0, currency:'USD', payments:[]});
     dbSaveProject(PROJECTS[PROJECTS.length-1]);
     const before=Z.length;
-    Object.entries(o.r.by).forEach(([pid,days],i)=>zone({p:id, d:sm.team, floor:'Block '+(i+1), n:1,
-      name:`${person(pid).name} block`, effort:days.length, status:'pending', a:pid, earliest:days[0]}));
+    sm.floors.forEach(f=>{
+      for(let k=1;k<=f.rooms;k++){
+        zone({p:id, d:sm.team, floor:f.name, n:k, name: sm.team==='viz'?'Room '+String(k).padStart(2,'0'):'Package '+k,
+          effort:f.days, status:'pending', a:primary, earliest:o.r.start});
+      }
+    });
     Z.slice(before).forEach(dbSaveZone);
     S=build(); state.project=id; state.disc=sm.team; state.tab='production'; state.sim.ran=false; render(); window.scrollTo({top:0});
-    toast(`${sm.name} is in production · finish ${fmt(D(o.r.finish))}`); return;
+    toast(`${sm.name} is in production · ${totalEffort}d across ${sm.floors.length} floor${sm.floors.length>1?'s':''} · forecast finish ${fmt(D(o.r.finish))}`); return;
   }
 });
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
-  if(t.id==='projSel' || t.id==='ganttProjSel'){ state.project=t.value; render(); return; }
+  if(t.id==='projSel'){ state.project=t.value; render(); return; }
+  if(t.id==='ganttProjSel'){ state.planProject=t.value; render(); return; }
   if(t.id==='teamCalPerson'){ state.teamCalPerson=t.value; state.teamCalSelDay=null; render(); return; }
+  if(t.dataset.simFloorName!==undefined){ state.sim.floors[+t.dataset.simFloorName].name=t.value.trim()||'Floor'; render(); return; }
+  if(t.dataset.simFloorRooms!==undefined){ state.sim.floors[+t.dataset.simFloorRooms].rooms=Math.max(1,Math.round(+t.value||1)); render(); return; }
+  if(t.dataset.simFloorDays!==undefined){ state.sim.floors[+t.dataset.simFloorDays].days=Math.max(0.5,+t.value||0.5); render(); return; }
   if(t.dataset.tblRename!==undefined){
     const zz=Z.find(x=>x.id===t.dataset.tblRename); if(!zz) return;
     const newName=t.value.trim(); if(!newName){ t.value=zz.name; return; }
