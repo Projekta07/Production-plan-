@@ -358,7 +358,7 @@ function fromDbZone(r){
   };
 }
 async function dbSaveZone(z){ if(!sb||!z) return; const {error}=await sb.from('studio_zones').upsert(toDbZone(z)); if(error) toast('Not saved: '+error.message); }
-async function dbSaveFloorPlan(fp){ if(!sb) return; const {error}=await sb.from('studio_floor_plans').upsert({id:fp.id, project_id:fp.p, floor:fp.floor, image_url:fp.imageUrl||null, area_sqm:fp.area||null, explication:fp.explication||[]}); if(error) toast('Not saved: '+error.message); }
+async function dbSaveFloorPlan(fp){ if(!sb) return; const {error}=await sb.from('studio_floor_plans').upsert({id:fp.id, project_id:fp.p, floor:fp.floor, image_url:fp.imageUrl||null, area_sqm:fp.area||null, explication:fp.explication||[], room_polygons:fp.roomPolygons||{}}); if(error) toast('Not saved: '+error.message); }
 async function dbDeleteFloorPlan(id){ if(!sb) return; const {error}=await sb.from('studio_floor_plans').delete().eq('id',id); if(error) toast('Not deleted: '+error.message); }
 /* завантажити файл планування в Storage і прив'язати до (проєкт, поверх) — не чіпає жодної реальної зони */
 async function uploadFloorPlan(pid, floor, file){
@@ -369,7 +369,7 @@ async function uploadFloorPlan(pid, floor, file){
   if(up.error){ toast('Upload failed: '+up.error.message); return; }
   const { data: pub } = sb.storage.from('floor-plans').getPublicUrl(path);
   let fp = FLOOR_PLANS.find(x=>x.p===pid && x.floor===floor);
-  if(!fp){ fp = {id:'fp-'+pid+'-'+Date.now(), p:pid, floor, explication:[]}; FLOOR_PLANS.push(fp); }
+  if(!fp){ fp = {id:'fp-'+pid+'-'+Date.now(), p:pid, floor, explication:[], roomPolygons:{}}; FLOOR_PLANS.push(fp); }
   fp.imageUrl = pub.publicUrl;
   await dbSaveFloorPlan(fp);
   render();
@@ -586,7 +586,7 @@ const state = {
   tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
   ganttDisc:'all', ganttOpen:{}, ganttZoom:'week', quickSetupOpen:false, roomsView:'dashboard',
   calSubview:'fit', teamCalPerson:null, teamCalMonthOffset:0, teamCalSelDay:null, scheduleIssues:[], expandedNotes:{},
-  planView:'gantt', planProject:null, projCalMonthOffset:0, projCalSelDay:null, projCalDisc:'all',
+  planView:'gantt', planProject:null, projCalMonthOffset:0, projCalSelDay:null, projCalDisc:'all', planDraw:null,
   sim:{name:'Tanger 2', team:'viz', ran:false, pick:0, floors:[{name:'Ground', rooms:6, days:2},{name:'First', rooms:8, days:2}]},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
   potentials:[
@@ -1497,7 +1497,7 @@ function floorPlansCard(pr){
         const drawnCount = fp && fp.explication && fp.explication.length ? fp.explication.length : null;
         return `<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line-2)">
           ${fp&&fp.imageUrl
-            ? `<img src="${fp.imageUrl}" data-expand-plan="${esc(fp.imageUrl)}" alt="${esc(f)} plan" style="width:72px;height:72px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid var(--line)">`
+            ? `<img src="${fp.imageUrl}" data-expand-plan="${esc(fp.id)}" alt="${esc(f)} plan" style="width:72px;height:72px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid var(--line)">`
             : `<div style="width:72px;height:72px;border-radius:9px;background:var(--line-2);display:grid;place-items:center;color:var(--muted);font-size:10px;text-align:center;flex:none">No plan</div>`}
           <div style="flex:1;min-width:0">
             <div style="font-size:14px">${esc(f)}</div>
@@ -2668,6 +2668,46 @@ function renderSequenceDrawer(){
     <button class="btn" data-seq-apply style="margin-top:18px;width:100%">Apply sequence</button>`);
 }
 
+/* ---------- Floor plan viewer: контур кімнати малюється вручну один раз, колір завжди йде з живого статусу зони ---------- */
+function openFloorPlanViewer(fpId){
+  const fp = FLOOR_PLANS.find(x=>x.id===fpId); if(!fp) return;
+  const zones = Z.filter(z=>z.p===fp.p && z.floor===fp.floor && z.d==='viz').sort((a,b)=>a.n-b.n);
+  const polys = fp.roomPolygons || {};
+  const drawing = state.planDraw && state.planDraw.planId===fpId ? state.planDraw : null;
+  drawer(`<button class="x" data-close aria-label="Close">×</button>
+    <h3 style="margin-bottom:12px">${esc(fp.floor)} plan</h3>
+    <div style="position:relative;width:100%;border-radius:10px;overflow:hidden;border:1px solid var(--line)">
+      ${fp.imageUrl? `<img src="${esc(fp.imageUrl)}" style="width:100%;display:block">` : `<div class="muted" style="padding:40px;text-align:center">No image uploaded yet</div>`}
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;${drawing?'cursor:crosshair':''}" data-plan-svg="${fpId}">
+        ${Object.entries(polys).map(([zid,pts])=>{
+          const z = Z.find(x=>x.id===zid); if(!z || !pts.length) return '';
+          const st = STATUS[z.status];
+          return `<polygon points="${pts.map(p=>p.join(',')).join(' ')}" fill="${st.col}" fill-opacity="0.4" stroke="${st.ink}" stroke-width="0.35" data-plan-zone="${zid}" style="cursor:pointer"></polygon>`;
+        }).join('')}
+        ${drawing? `<polyline points="${drawing.points.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="0.4" stroke-dasharray="1,1"></polyline>
+          ${drawing.points.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="0.7" fill="var(--ink)"></circle>`).join('')}`:''}
+      </svg>
+    </div>
+    ${drawing
+      ? `<div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="muted" style="font-size:12px;flex:1;min-width:140px">Outlining <b>${esc(Z.find(z=>z.id===drawing.zoneId)?.name||'')}</b> — click the image to add points (${drawing.points.length} so far)</span>
+          <button class="pill" data-plan-undo>Undo point</button>
+          <button class="pill" data-plan-cancel-draw>Cancel</button>
+          <button class="btn" data-plan-finish ${drawing.points.length<3?'disabled':''}>Finish outline</button>
+        </div>`
+      : `<div style="margin-top:16px">
+          <div class="muted" style="font-size:12px;margin-bottom:8px">Outlined rooms always show the room's current status — nothing to recolor by hand when a status changes.</div>
+          ${zones.length? zones.map(z=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2)">
+            <span class="status-chip" style="background:${STATUS[z.status].col};color:${STATUS[z.status].ink};font-size:10.5px">${STATUS[z.status].lab}</span>
+            <span style="flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(z.name)}</span>
+            ${polys[z.id]&&polys[z.id].length
+              ? `<button class="pill" data-plan-continue="${fpId}|${z.id}">Continue</button><button class="pill" data-plan-clear="${fpId}|${z.id}">Clear</button>`
+              : `<button class="pill" data-plan-start="${fpId}|${z.id}">Outline</button>`}
+          </div>`).join('') : `<div class="muted" style="padding:10px 0">No rooms tracked on this floor yet.</div>`}
+        </div>`}
+  `);
+}
+
 function openZone(id){
   const z = Z.find(x=>x.id===id); if(!z) return;
   state.selZone=id;
@@ -2863,14 +2903,47 @@ document.addEventListener('click', e=>{
   if(n=el('[data-sequence-revisions]')){ openSequenceRevisions(n.dataset.sequenceRevisions.split('|')[0], n.dataset.sequenceRevisions.split('|')[1]); return; }
   if(n=el('[data-note-expand]')){ state.expandedNotes[n.dataset.noteExpand]=true; render(); return; }
   if(n=el('[data-note-collapse]')){ delete state.expandedNotes[n.dataset.noteCollapse]; render(); return; }
-  if(n=el('[data-expand-plan]')){
-    const url = n.dataset.expandPlan;
-    drawer(`<button class="x" data-close aria-label="Close">×</button>
-      <h3 style="margin-bottom:14px">Floor plan</h3>
-      <img src="${esc(url)}" style="width:100%;border-radius:12px;border:1px solid var(--line)">
-      <a href="${esc(url)}" target="_blank" rel="noopener" class="pill" style="display:inline-block;margin-top:14px;text-decoration:none">Open full size ↗</a>`);
+  if(n=el('[data-expand-plan]')){ openFloorPlanViewer(n.dataset.expandPlan); return; }
+  if(n=el('[data-plan-start]')){
+    const [fpId,zid] = n.dataset.planStart.split('|');
+    state.planDraw = {planId:fpId, zoneId:zid, points:[]};
+    openFloorPlanViewer(fpId); return;
+  }
+  if(n=el('[data-plan-continue]')){
+    const [fpId,zid] = n.dataset.planContinue.split('|');
+    const fp = FLOOR_PLANS.find(x=>x.id===fpId);
+    state.planDraw = {planId:fpId, zoneId:zid, points:(fp.roomPolygons[zid]||[]).map(p=>[...p])};
+    openFloorPlanViewer(fpId); return;
+  }
+  if(n=el('[data-plan-clear]')){
+    const [fpId,zid] = n.dataset.planClear.split('|');
+    const fp = FLOOR_PLANS.find(x=>x.id===fpId); if(!fp) return;
+    delete fp.roomPolygons[zid]; dbSaveFloorPlan(fp);
+    openFloorPlanViewer(fpId); return;
+  }
+  if(n=el('[data-plan-undo]')){ if(state.planDraw && state.planDraw.points.length) state.planDraw.points.pop(); openFloorPlanViewer(state.planDraw.planId); return; }
+  if(n=el('[data-plan-cancel-draw]')){ const id=state.planDraw.planId; state.planDraw=null; openFloorPlanViewer(id); return; }
+  if(n=el('[data-plan-finish]')){
+    const {planId, zoneId, points} = state.planDraw;
+    const fp = FLOOR_PLANS.find(x=>x.id===planId); if(!fp) return;
+    if(!fp.roomPolygons) fp.roomPolygons = {};
+    fp.roomPolygons[zoneId] = points;
+    dbSaveFloorPlan(fp);
+    state.planDraw = null;
+    openFloorPlanViewer(planId);
+    toast('Outline saved — it will recolor itself whenever the status changes');
     return;
   }
+  if(n=el('[data-plan-svg]') && state.planDraw && state.planDraw.planId===n.dataset.planSvg){
+    // в режимі малювання будь-який клік у межах плану додає точку — навіть якщо влучили поверх уже готового контуру
+    const rect = n.getBoundingClientRect();
+    const x = Math.max(0,Math.min(100, (e.clientX-rect.left)/rect.width*100));
+    const y = Math.max(0,Math.min(100, (e.clientY-rect.top)/rect.height*100));
+    state.planDraw.points.push([Math.round(x*10)/10, Math.round(y*10)/10]);
+    openFloorPlanViewer(n.dataset.planSvg);
+    return;
+  }
+  if(n=el('[data-plan-zone]')){ openZone(n.dataset.planZone); return; }
   if(n=el('[data-rooms-view]')){ state.roomsView=n.dataset.roomsView; render(); return; }
   if(n=el('[data-tbl-remove]')){
     const id=n.dataset.tblRemove, z=Z.find(x=>x.id===id); if(!z) return;
@@ -3232,7 +3305,7 @@ async function boot(){
     Z.length=0; Z.push(...zones.data.map(fromDbZone));
     state.potentials.length=0; state.potentials.push(...pot.data.map(r=>({id:r.id,name:r.name,effort:Number(r.effort),team:r.team,revenue:Number(r.revenue),on:r.is_on})));
     FLOOR_PLANS.length=0;
-    if(!plans.error) FLOOR_PLANS.push(...plans.data.map(r=>({id:r.id,p:r.project_id,floor:r.floor,imageUrl:r.image_url,area:r.area_sqm?Number(r.area_sqm):null,explication:r.explication||[]})));
+    if(!plans.error) FLOOR_PLANS.push(...plans.data.map(r=>({id:r.id,p:r.project_id,floor:r.floor,imageUrl:r.image_url,area:r.area_sqm?Number(r.area_sqm):null,explication:r.explication||[],roomPolygons:r.room_polygons||{}})));
     seq = Z.reduce((n,z)=>{ const m=/^z(\d+)$/.exec(z.id); return m? Math.max(n,+m[1]) : n; }, 0);
     S = build(); render();
     toast('Loaded from Production Plan (Supabase)');
