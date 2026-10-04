@@ -358,6 +358,23 @@ function fromDbZone(r){
   };
 }
 async function dbSaveZone(z){ if(!sb||!z) return; const {error}=await sb.from('studio_zones').upsert(toDbZone(z)); if(error) toast('Not saved: '+error.message); }
+async function dbSaveFloorPlan(fp){ if(!sb) return; const {error}=await sb.from('studio_floor_plans').upsert({id:fp.id, project_id:fp.p, floor:fp.floor, image_url:fp.imageUrl||null, area_sqm:fp.area||null, explication:fp.explication||[]}); if(error) toast('Not saved: '+error.message); }
+async function dbDeleteFloorPlan(id){ if(!sb) return; const {error}=await sb.from('studio_floor_plans').delete().eq('id',id); if(error) toast('Not deleted: '+error.message); }
+/* завантажити файл планування в Storage і прив'язати до (проєкт, поверх) — не чіпає жодної реальної зони */
+async function uploadFloorPlan(pid, floor, file){
+  if(!sb){ toast('Not connected to the database'); return; }
+  const ext = (file.name.split('.').pop()||'jpg').toLowerCase();
+  const path = `${pid}/${floor.replace(/[^a-z0-9]+/gi,'-')}-${Date.now()}.${ext}`;
+  const up = await sb.storage.from('floor-plans').upload(path, file, {upsert:true});
+  if(up.error){ toast('Upload failed: '+up.error.message); return; }
+  const { data: pub } = sb.storage.from('floor-plans').getPublicUrl(path);
+  let fp = FLOOR_PLANS.find(x=>x.p===pid && x.floor===floor);
+  if(!fp){ fp = {id:'fp-'+pid+'-'+Date.now(), p:pid, floor, explication:[]}; FLOOR_PLANS.push(fp); }
+  fp.imageUrl = pub.publicUrl;
+  await dbSaveFloorPlan(fp);
+  render();
+  toast(`${floor}: plan uploaded`);
+}
 async function dbDeleteZone(id){ if(!sb) return; const {error}=await sb.from('studio_zones').delete().eq('id',id); if(error) toast('Not deleted: '+error.message); }
 async function dbSaveProject(p){ if(!sb) return; const {error}=await sb.from('studio_projects').upsert({id:p.id,name:p.name,prio:p.prio,status:p.status,revenue:p.revenue||0,currency:p.currency||'USD',payments:p.payments||[]}); if(error) toast('Not saved: '+error.message); }
 async function dbSaveRate(m){ if(!sb) return; const {error}=await sb.from('studio_team').update({rate:m.rate}).eq('id',m.id); if(error) toast('Not saved: '+error.message); }
@@ -413,6 +430,7 @@ const REASONS = ['Sent to client — awaiting feedback','Waiting for client','Wa
 
 /* ЗОНА = кімната (3D) або пакет креслень. effort — дні на першу версію. */
 let Z = [];
+let FLOOR_PLANS = []; // довідкові планування поверхів — ЗОВСІМ окремо від реальних виробничих зон, нічого тут не впливає на розклад
 let seq = 0;
 function zone(o){ Z.push({id:'z'+(++seq), revEffort:1, earliest:iso(TODAY), reason:null, ...o}); }
 const MAP = {A:'approved', R:'revision', P:'paused', N:'pending'};
@@ -688,12 +706,21 @@ function build(extra=[]){
     if(!isWork(day)) continue;
     const key = iso(day);
     TEAM.forEach(m=>{
-      const c = items.filter(x=>x.a===m.id && ready(x,day));
-      if(!c.length) return;
-      c.sort((a,b)=>(proj(a.p).prio-proj(b.p).prio) || (floorOrder(a.floor)-floorOrder(b.floor)) || (a.n-b.n));
-      const it = c[0];
-      it.days.push(key); it.rem--; occ[m.id].set(key, it.id);
-      if(it.rem<=0) it.fin = key;
+      // один день = 1.0 "місткості" людини. Завдання на цілий день чи довше забирає її всю, як і раніше.
+      // Коротша за день правка (rem<1) забирає лише свою частку — лишок місткості йде на наступну готову зону того самого дня.
+      let capLeft = 1, guard = 0;
+      const dayIds = [];
+      while(capLeft > 1e-9 && guard++ < 50){
+        const c = items.filter(x=>x.a===m.id && ready(x,day));
+        if(!c.length) break;
+        c.sort((a,b)=>(proj(a.p).prio-proj(b.p).prio) || (floorOrder(a.floor)-floorOrder(b.floor)) || (a.n-b.n));
+        const it = c[0];
+        const take = Math.min(capLeft, it.rem);
+        it.rem -= take; capLeft -= take;
+        it.days.push(key); dayIds.push(it.id);
+        if(it.rem<=1e-9){ it.rem=0; it.fin = key; }
+      }
+      if(dayIds.length) occ[m.id].set(key, dayIds);
     });
   }
   items.forEach(x=>{ if(x.days.length){ x.s=x.days[0]; x.e=x.days[x.days.length-1]; } });
@@ -728,8 +755,8 @@ function blocksOf(id, extraOcc){
   while(d<=r.end){
     if(isWork(d)){
       const key=iso(d);
-      const zid = S.occ[id].get(key);
-      const z = zid ? S.byId.get(zid) : (extraOcc && extraOcc.has(key) ? {p:'__pot', d:'pot', floor:''} : null);
+      const zids = S.occ[id].get(key);
+      const z = zids&&zids.length ? S.byId.get(zids[0]) : (extraOcc && extraOcc.has(key) ? {p:'__pot', d:'pot', floor:''} : null);
       const tag = z ? z.p+'|'+z.d : null;
       if(tag && cur && cur.tag===tag){ cur.e=key; cur.days++; cur.floors[z.floor]=(cur.floors[z.floor]||0)+1; }
       else if(tag){ cur={tag, p:z.p, d:z.d, s:key, e:key, days:1, floors:{[z.floor]:1}}; out.push(cur); }
@@ -777,10 +804,14 @@ function periodLoad(id, per){
   let scheduled = 0;
   [...S.occ[id].keys()].forEach(k=>{
     if(D(k)<per.start || D(k)>per.end) return;
-    const it = S.byId.get(S.occ[id].get(k));
-    if(!it || proj(it.p).status!=='confirmed') return;
-    byProject[it.p] = (byProject[it.p]||0)+1;
-    scheduled++;
+    const zids = S.occ[id].get(k) || [];
+    let dayCounted = false;
+    zids.forEach(zid=>{
+      const it = S.byId.get(zid);
+      if(!it || proj(it.p).status!=='confirmed') return;
+      byProject[it.p] = (byProject[it.p]||0)+1;   // кожен дотик зони в цей день рахується в її проєкт
+      if(!dayCounted){ scheduled++; dayCounted=true; } // сам календарний день рахується лише раз, навіть якщо його ділять кілька правок
+    });
   });
   const totalRemaining = remainingConfirmed(id);
   return {
@@ -1075,9 +1106,9 @@ function projectBlocksOf(personId, projectId, r){
   while(d<=r.end){
     if(isWork(d)){
       const key=iso(d);
-      const zid = S.occ[personId].get(key);
-      const z = zid ? S.byId.get(zid) : null;
-      if(z && z.p===projectId){ if(cur) cur.e=key; else { cur={s:key,e:key}; out.push(cur); } }
+      const zids = S.occ[personId].get(key) || [];
+      const onProject = zids.some(zid=>{ const z=S.byId.get(zid); return z && z.p===projectId; });
+      if(onProject){ if(cur) cur.e=key; else { cur={s:key,e:key}; out.push(cur); } }
       else cur=null;
     }
     d=addDays(d,1);
@@ -1271,11 +1302,13 @@ function dayTasksForStudio(day, discFilter){
   const key = iso(day), out=[];
   TEAM.forEach(m=>{
     const occ = S.occ[m.id]; if(!occ) return;
-    const zid = occ.get(key); if(!zid) return;
-    const z = Z.find(x=>x.id===zid); if(!z || proj(z.p).status!=='confirmed') return;
-    if(discFilter && discFilter!=='all' && z.d!==discFilter) return;
-    const it = S.byId.get(zid), idx = it.days.indexOf(key);
-    out.push({z, person:m, idx:idx+1, total:it.days.length});
+    const zids = occ.get(key); if(!zids) return;
+    zids.forEach(zid=>{
+      const z = Z.find(x=>x.id===zid); if(!z || proj(z.p).status!=='confirmed') return;
+      if(discFilter && discFilter!=='all' && z.d!==discFilter) return;
+      const it = S.byId.get(zid), idx = it.days.indexOf(key);
+      out.push({z, person:m, idx:idx+1, total:it.days.length});
+    });
   });
   return out;
 }
@@ -1347,11 +1380,13 @@ function dayTasksForProject(projectId, day, discFilter){
   const key = iso(day), out=[];
   TEAM.forEach(m=>{
     const occ = S.occ[m.id]; if(!occ) return;
-    const zid = occ.get(key); if(!zid) return;
-    const z = Z.find(x=>x.id===zid); if(!z || z.p!==projectId) return;
-    if(discFilter && discFilter!=='all' && z.d!==discFilter) return;
-    const it = S.byId.get(zid), idx = it.days.indexOf(key);
-    out.push({z, person:m, idx:idx+1, total:it.days.length});
+    const zids = occ.get(key); if(!zids) return;
+    zids.forEach(zid=>{
+      const z = Z.find(x=>x.id===zid); if(!z || z.p!==projectId) return;
+      if(discFilter && discFilter!=='all' && z.d!==discFilter) return;
+      const it = S.byId.get(zid), idx = it.days.indexOf(key);
+      out.push({z, person:m, idx:idx+1, total:it.days.length});
+    });
   });
   return out;
 }
@@ -1447,6 +1482,38 @@ function viewGanttPlan(){
 /* ======================================================================
    VIEW 1 · PROJECT PRODUCTION
    ====================================================================== */
+/* ---------- Floor plans: довідкові креслення по поверхах — абсолютно окремо від реальних зон і розкладу ---------- */
+function floorPlansCard(pr){
+  const floors = [...new Set(Z.filter(z=>z.p===pr.id).map(z=>z.floor))];
+  const plans = FLOOR_PLANS.filter(fp=>fp.p===pr.id);
+  if(!floors.length && !plans.length) return '';
+  const allFloorNames = [...new Set([...floors, ...plans.map(p=>p.floor)])].sort((a,b)=>floorOrder(a)-floorOrder(b));
+  return `<section class="card" style="margin-bottom:16px">
+    <div class="card-h"><h2>Floor plans</h2><span class="hint">reference drawings — kept separate from the room tracking below, never auto-applied</span></div>
+    <div class="card-b">
+      ${allFloorNames.map(f=>{
+        const fp = plans.find(p=>p.floor===f);
+        const trackedCount = Z.filter(z=>z.p===pr.id && z.floor===f && z.d==='viz').length;
+        const drawnCount = fp && fp.explication && fp.explication.length ? fp.explication.length : null;
+        return `<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line-2)">
+          ${fp&&fp.imageUrl
+            ? `<img src="${fp.imageUrl}" data-expand-plan="${esc(fp.imageUrl)}" alt="${esc(f)} plan" style="width:72px;height:72px;object-fit:cover;border-radius:9px;cursor:pointer;border:1px solid var(--line)">`
+            : `<div style="width:72px;height:72px;border-radius:9px;background:var(--line-2);display:grid;place-items:center;color:var(--muted);font-size:10px;text-align:center;flex:none">No plan</div>`}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px">${esc(f)}</div>
+            <div class="muted" style="font-size:12px">
+              ${drawnCount? `Drawing: ${drawnCount} rooms${fp.area?' · '+fp.area+' m²':''}` : 'No room list on file yet'}${trackedCount?` · Tracked here: ${trackedCount}`:''}
+            </div>
+            ${drawnCount && trackedCount && drawnCount!==trackedCount? `<div style="font-size:11px;color:var(--warn-t);margin-top:3px">Different room count than Quick setup — not synced automatically, nothing below changes on its own</div>`:''}
+          </div>
+          <label class="pill" style="cursor:pointer;flex:none">${fp&&fp.imageUrl?'Replace':'Upload'}
+            <input type="file" accept="image/*,.pdf" data-upload-plan="${pr.id}|${esc(f)}" style="display:none"></label>
+        </div>`;
+      }).join('')}
+    </div>
+  </section>`;
+}
+
 /* ---------- Quick setup: коротка форма "кімнат на поверх × днів на кімнату", без 35 попапів ---------- */
 function quickSetupPanel(pr, disc){
   const dc = DISC[disc];
@@ -1591,6 +1658,8 @@ function viewProduction(){
       })()}</div></div>
     <div class="kpi"><div class="l">Forecast finish</div><div class="v">${fin?fmt(D(fin)):(b.left?'—':'Done')}</div><div class="f">${fin? 'from the team calendar' : b.left? 'no one assigned':'all approved'}</div></div>
   </div>
+
+  ${floorPlansCard(pr)}
 
   ${quickSetupPanel(pr, state.disc)}
 
@@ -2038,13 +2107,15 @@ function monthGridDays(y, mo){
   const start = monday(new Date(y, mo, 1));
   return Array.from({length:42}, (_,i)=>addDays(start,i));
 }
-function dayTaskFor(personId, day){
-  const occ = S.occ[personId]; if(!occ) return null;
-  const key = iso(day), zid = occ.get(key); if(!zid) return null;
-  const z = Z.find(x=>x.id===zid), it = S.byId.get(zid);
-  if(!z || !it) return null;
-  const idx = it.days.indexOf(key);
-  return {z, idx: idx+1, total: it.days.length};
+/* один день людини може тепер містити кілька дотичних зон (коротші за день правки діляться днем) — завжди масив */
+function dayTasksForPerson(personId, day){
+  const occ = S.occ[personId]; if(!occ) return [];
+  const key = iso(day), zids = occ.get(key); if(!zids || !zids.length) return [];
+  return zids.map(zid=>{
+    const z = Z.find(x=>x.id===zid), it = S.byId.get(zid);
+    if(!z || !it) return null;
+    return {z, idx: it.days.indexOf(key)+1, total: it.days.length};
+  }).filter(Boolean);
 }
 function teamCalendarView(){
   const pid = state.teamCalPerson && person(state.teamCalPerson) ? state.teamCalPerson : TEAM[0].id;
@@ -2055,7 +2126,7 @@ function teamCalendarView(){
   const monthLabel = base.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
   const dow = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const selDay = state.teamCalSelDay;
-  const selTask = selDay ? dayTaskFor(pid, D(selDay)) : null;
+  const selTasks = selDay ? dayTasksForPerson(pid, D(selDay)) : [];
   return `
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
     <select id="teamCalPerson" class="sel">${TEAM.map(m=>`<option value="${m.id}" ${m.id===pid?'selected':''}>${esc(m.name)} · ${ROLE_LABEL[m.team]||m.team}</option>`).join('')}</select>
@@ -2073,38 +2144,38 @@ function teamCalendarView(){
         <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
           ${days.map(d=>{
             const inMonth = d.getMonth()===mo;
-            const task = dayTaskFor(pid, d);
+            const tasks = dayTasksForPerson(pid, d);
             const isToday = iso(d)===iso(TODAY);
             const sel = selDay===iso(d);
-            return `<div data-teamcal-day="${iso(d)}" style="min-height:74px;border-radius:10px;padding:6px;cursor:pointer;background:${sel?'var(--line-2)':'transparent'};border:1.5px solid ${isToday?'var(--ink-2)':'transparent'};opacity:${inMonth?1:.32}">
+            return `<div data-teamcal-day="${iso(d)}" style="min-height:${tasks.length>1?74+(tasks.length-1)*34:74}px;border-radius:10px;padding:6px;cursor:pointer;background:${sel?'var(--line-2)':'transparent'};border:1.5px solid ${isToday?'var(--ink-2)':'transparent'};opacity:${inMonth?1:.32}">
               <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${d.getDate()}</div>
-              ${task? `<div style="background:${person(task.z.a).color};border-radius:7px;padding:5px 6px;line-height:1.3">
+              ${tasks.map(task=>`<div style="background:${person(task.z.a).color};border-radius:7px;padding:5px 6px;line-height:1.3;margin-bottom:3px">
                   <div style="font-size:10.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj(task.z.p).name)}</div>
                   <div style="font-size:9px;color:var(--ink-2)">${DISC[task.z.d].short} · ${esc(task.z.scope||task.z.name)}</div>
                   ${task.z.status==='revision'? `<div style="font-size:9px;color:var(--rev-t);font-weight:600;margin-top:1px">Revision${task.z.revisionNote?': '+esc(task.z.revisionNote.slice(0,28))+(task.z.revisionNote.length>28?'…':''):''}</div>`
                     : `<div style="font-size:9px;color:var(--ink-2);margin-top:1px">${task.idx}/${task.total}d</div>`}
-                </div>` : ''}
+                </div>`).join('')}
             </div>`;
           }).join('')}
         </div>
       </div>
     </section>
     <section class="card">
-      <div class="card-h"><h2>${selDay? fmt(D(selDay)) : 'Pick a day'}</h2></div>
+      <div class="card-h"><h2>${selDay? fmt(D(selDay)) : 'Pick a day'}</h2>${selTasks.length>1?`<span class="hint">${selTasks.length} tasks this day</span>`:''}</div>
       <div class="card-b">
         ${!selDay? `<div class="muted" style="font-size:13px">Click any day to see what ${esc(person(pid).name)} is working on.</div>`
-          : !selTask? `<div class="muted" style="font-size:13px">Nothing scheduled for ${esc(person(pid).name)} this day.</div>`
-          : `<div style="cursor:pointer" data-open-zone="${selTask.z.id}">
+          : !selTasks.length? `<div class="muted" style="font-size:13px">Nothing scheduled for ${esc(person(pid).name)} this day.</div>`
+          : selTasks.map(selTask=>`<div style="cursor:pointer;padding:12px 0;border-bottom:1px solid var(--line-2)" data-open-zone="${selTask.z.id}">
               <div style="font-size:15px">${esc(proj(selTask.z.p).name)}</div>
               <div class="muted" style="font-size:12.5px;margin-top:3px">${DISC[selTask.z.d].name} · ${esc(selTask.z.floor)}${selTask.z.scope?' · '+esc(selTask.z.scope):''}</div>
               <div style="margin-top:10px;font-size:13px">${esc(selTask.z.name)} · day ${selTask.idx} of ${selTask.total}</div>
               <div style="margin-top:6px"><span class="status-chip" style="background:${STATUS[selTask.z.status].col};color:${STATUS[selTask.z.status].ink};font-size:11px">${STATUS[selTask.z.status].lab}</span></div>
               ${selTask.z.status==='revision' && selTask.z.revisionNote? `<div style="margin-top:10px;padding:10px;background:var(--line-2);border-radius:9px;font-size:12.5px">${esc(selTask.z.revisionNote)}</div>`:''}
-            </div>`}
+            </div>`).join('')}
       </div>
     </section>
   </div>
-  <p class="muted" style="font-size:11.5px;margin-top:12px">Pulled straight from the same schedule as Project calculator and Production plan — change anything there and it updates here too.</p>`;
+  <p class="muted" style="font-size:11.5px;margin-top:12px">Pulled straight from the same schedule as Project calculator and Production plan — change anything there and it updates here too. Short, same-day fixes can now share one day instead of each claiming a whole one.</p>`;
 }
 
 function viewCalendar(){
@@ -2792,6 +2863,14 @@ document.addEventListener('click', e=>{
   if(n=el('[data-sequence-revisions]')){ openSequenceRevisions(n.dataset.sequenceRevisions.split('|')[0], n.dataset.sequenceRevisions.split('|')[1]); return; }
   if(n=el('[data-note-expand]')){ state.expandedNotes[n.dataset.noteExpand]=true; render(); return; }
   if(n=el('[data-note-collapse]')){ delete state.expandedNotes[n.dataset.noteCollapse]; render(); return; }
+  if(n=el('[data-expand-plan]')){
+    const url = n.dataset.expandPlan;
+    drawer(`<button class="x" data-close aria-label="Close">×</button>
+      <h3 style="margin-bottom:14px">Floor plan</h3>
+      <img src="${esc(url)}" style="width:100%;border-radius:12px;border:1px solid var(--line)">
+      <a href="${esc(url)}" target="_blank" rel="noopener" class="pill" style="display:inline-block;margin-top:14px;text-decoration:none">Open full size ↗</a>`);
+    return;
+  }
   if(n=el('[data-rooms-view]')){ state.roomsView=n.dataset.roomsView; render(); return; }
   if(n=el('[data-tbl-remove]')){
     const id=n.dataset.tblRemove, z=Z.find(x=>x.id===id); if(!z) return;
@@ -3034,6 +3113,12 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
+  if(t.dataset.uploadPlan!==undefined){
+    const [pid, floor] = t.dataset.uploadPlan.split('|');
+    const file = t.files && t.files[0]; if(!file) return;
+    uploadFloorPlan(pid, floor, file);
+    return;
+  }
   if(t.id==='projSel'){ state.project=t.value; render(); return; }
   if(t.id==='ganttProjSel'){ state.planProject=t.value; render(); return; }
   if(t.id==='seqStartInput'){ state.seqStart=t.value||state.seqStart; return; }
@@ -3134,17 +3219,20 @@ async function boot(){
   S = build(); render();               // демо-дані одразу, щоб екран не був порожнім
   if(!sb) return;
   try{
-    const [team, proj, zones, pot] = await Promise.all([
+    const [team, proj, zones, pot, plans] = await Promise.all([
       sb.from('studio_team').select('*'),
       sb.from('studio_projects').select('*'),
       sb.from('studio_zones').select('*'),
       sb.from('studio_potentials').select('*'),
+      sb.from('studio_floor_plans').select('*'),
     ]);
     if(team.error||proj.error||zones.error||pot.error) throw (team.error||proj.error||zones.error||pot.error);
     TEAM.length=0; TEAM.push(...team.data.map(r=>({id:r.id,name:r.name,team:r.team,color:r.color,rate:Number(r.rate),type:r.type||'staff'})));
     PROJECTS.length=0; PROJECTS.push(...proj.data.map(r=>({id:r.id,name:r.name,prio:r.prio,status:r.status,revenue:Number(r.revenue),currency:r.currency||'USD',payments:r.payments||[]})));
     Z.length=0; Z.push(...zones.data.map(fromDbZone));
     state.potentials.length=0; state.potentials.push(...pot.data.map(r=>({id:r.id,name:r.name,effort:Number(r.effort),team:r.team,revenue:Number(r.revenue),on:r.is_on})));
+    FLOOR_PLANS.length=0;
+    if(!plans.error) FLOOR_PLANS.push(...plans.data.map(r=>({id:r.id,p:r.project_id,floor:r.floor,imageUrl:r.image_url,area:r.area_sqm?Number(r.area_sqm):null,explication:r.explication||[]})));
     seq = Z.reduce((n,z)=>{ const m=/^z(\d+)$/.exec(z.id); return m? Math.max(n,+m[1]) : n; }, 0);
     S = build(); render();
     toast('Loaded from Production Plan (Supabase)');
