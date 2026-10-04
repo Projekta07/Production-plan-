@@ -563,7 +563,7 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 
 const state = {
   tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
-  ganttDisc:'all', ganttOpen:{}, ganttZoom:'week', quickSetupOpen:false,
+  ganttDisc:'all', ganttOpen:{}, ganttZoom:'week', quickSetupOpen:false, roomsView:'dashboard',
   sim:{name:'Tanger 2', effort:30, team:'viz', ran:true, pick:0},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
   potentials:[
@@ -1210,6 +1210,35 @@ function applyQuickSetup(pid, disc, floor, targetRooms, targetDays){
   toast(`${floor}: ${targetRooms} ${DISC[disc].unit} · ${targetDays}d each`);
 }
 
+/* ---------- Table view: той самий Excel-стиль — рядок на кімнату, редагується прямо в сітці ---------- */
+function roomsTable(pr, disc, zones, floors){
+  const dc = DISC[disc];
+  return `<div class="tlm-wrap"><table class="tlm">
+    <thead><tr><th>Floor / ${dc.unit1[0].toUpperCase()+dc.unit1.slice(1)}</th><th class="num">Effort</th><th>${dc.role}</th><th>Status</th><th>Scheduled</th><th></th></tr></thead>
+    <tbody>
+      ${floors.map(f=>{
+        const fz = zones.filter(z=>z.floor===f).sort((a,b)=>a.n-b.n);
+        const totalEffort = fz.reduce((n,z)=>n+z.effort,0);
+        return `<tr class="role-row"><td colspan="6">${esc(f)} · ${fz.length} ${dc.unit} · ${totalEffort}d total</td></tr>
+          ${fz.map(z=>{
+            const it = S.byId.get(z.id);
+            return `<tr>
+              <td style="text-align:left">${esc(z.name)}${z.scope?`<div class="muted" style="font-size:10.5px">${esc(z.scope)}</div>`:''}</td>
+              <td class="num"><input type="number" min="0.5" step="0.5" value="${z.effort}" data-tbl-effort="${z.id}" style="width:54px;text-align:right;border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px"></td>
+              <td style="text-align:left"><select data-tbl-assign="${z.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px;max-width:110px">
+                <option value="">—</option>${TEAM.filter(m=>m.team===disc).map(m=>`<option value="${m.id}" ${z.a===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></td>
+              <td style="text-align:left"><select data-tbl-status="${z.id}" style="border:1px solid var(--line);background:var(--line-2);border-radius:6px;padding:4px 6px">
+                ${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${z.status===k?'selected':''}>${v.lab}</option>`).join('')}</select></td>
+              <td class="muted" style="text-align:left;font-size:11.5px;white-space:nowrap">${it&&it.s? fmt(D(it.s))+' – '+fmt(D(it.e)) : (z.status==='approved'?'done':'—')}</td>
+              <td><button data-tbl-remove="${z.id}" title="Remove" style="border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1">×</button></td>
+            </tr>`;
+          }).join('')}
+          <tr><td colspan="6" style="text-align:left"><button class="add" data-add="${esc(f)}" style="font-size:12px">+ Add ${dc.unit1}</button></td></tr>`;
+      }).join('') || `<tr><td colspan="6" class="muted" style="text-align:left;padding:16px 0">No floors yet — use Quick setup above to add the first one.</td></tr>`}
+    </tbody>
+  </table></div>`;
+}
+
 function viewProduction(){
   const pr = proj(state.project), dc = DISC[state.disc];
   const zones = Z.filter(z=>z.p===pr.id && z.d===state.disc);
@@ -1228,11 +1257,12 @@ function viewProduction(){
     <select class="sel" id="projSel">${projects.map(p=>`<option value="${p.id}" ${p.id===pr.id?'selected':''}>${esc(p.name)}${p.status!=='confirmed'?' (potential)':''}</option>`).join('')}</select>
   </div>
   <div style="display:flex;flex-wrap:wrap;margin:-8px 0 16px;gap:10px;align-items:center">
-    <span class="pill" style="gap:8px">
-      <span class="muted" style="font-size:12px">Project start</span>
+    <label style="display:flex;align-items:center;gap:9px;background:var(--warn-t);color:#fff;border-radius:12px;padding:9px 16px;cursor:pointer;font-weight:500;box-shadow:0 2px 6px rgba(154,75,34,.3)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex:none"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <span style="font-size:13px;white-space:nowrap">Project start</span>
       <input type="date" id="projStart" value="${(()=>{ const all=Z.filter(z=>z.p===pr.id); return all.length? all.reduce((a,z)=>z.earliest<a?z.earliest:a, all[0].earliest) : iso(TODAY); })()}"
-        style="border:0;background:transparent;font:inherit;color:inherit;padding:0;cursor:pointer">
-    </span>
+        style="border:0;background:transparent;color:#fff;font:inherit;font-weight:600;padding:0;cursor:pointer;color-scheme:dark">
+    </label>
     <span class="muted" style="font-size:11.5px">sets the earliest date for every zone in this project at once · edit a single room's date from its own card</span>
   </div>
   ${pr.status!=='confirmed'? `<p class="muted" style="font-size:12.5px;margin:-10px 0 18px">Rooms and drawings below are planned but don't occupy anyone's real calendar until you confirm this project.</p>`:''}
@@ -1256,9 +1286,12 @@ function viewProduction(){
 
   <div class="grid2">
     <section class="card">
-      <div class="card-h"><h2>${dc.unit[0].toUpperCase()+dc.unit.slice(1)} by floor</h2><span class="hint">1 square = 1 ${dc.unit1} · tap to edit</span></div>
+      <div class="card-h"><h2>${dc.unit[0].toUpperCase()+dc.unit.slice(1)} by floor</h2><span class="hint">${state.roomsView==='table'?'edit effort, executor and status right in the grid':'1 square = 1 '+dc.unit1+' · tap to edit'}</span>
+        <div class="spacer"></div>
+        <div class="seg"><button data-rooms-view="dashboard" aria-pressed="${state.roomsView!=='table'}">Dashboard</button><button data-rooms-view="table" aria-pressed="${state.roomsView==='table'}">Table</button></div>
+      </div>
       <div class="card-b">
-        ${floors.map(f=>{
+        ${state.roomsView==='table'? roomsTable(pr, state.disc, zones, floors) : floors.map(f=>{
           const fz = zones.filter(z=>z.floor===f).sort((a,b)=>a.n-b.n);
           const done = fz.filter(z=>z.status==='approved').length;
           const left = fz.reduce((n,z)=>n+active(z),0);
@@ -1289,12 +1322,12 @@ function viewProduction(){
             </div>`:''}
           </div>`;
         }).join('') || '<div class="muted">No work in this discipline yet.</div>'}
-        <div class="legend">
+        ${state.roomsView!=='table'? `<div class="legend">
           <span><i style="background:var(--appr)"></i>Approved</span>
           <span><i style="background:var(--rev)"></i>Revision</span>
           <span><i style="background:var(--pause)"></i>Paused</span>
           <span><i style="background:var(--ns);border:1px dashed var(--ns-b)"></i>Not started</span>
-        </div>
+        </div>`:''}
       </div>
     </section>
 
@@ -2228,6 +2261,13 @@ document.addEventListener('click', e=>{
   if(n=el('[data-person-load]')){ openLoadDetail(n.dataset.personLoad, null); return; }
   if(n=el('[data-open-zone]')){ openZone(n.dataset.openZone); return; }
   if(n=el('[data-zone]')){ openZone(n.dataset.zone); render(); openZone(n.dataset.zone); return; }
+  if(n=el('[data-rooms-view]')){ state.roomsView=n.dataset.roomsView; render(); return; }
+  if(n=el('[data-tbl-remove]')){
+    const id=n.dataset.tblRemove, z=Z.find(x=>x.id===id); if(!z) return;
+    dbDeleteZone(id); Z=Z.filter(x=>x.id!==id);
+    if(state.selZone===id){ state.selZone=null; closeDrawer(); }
+    S=build(); render(); toast(`${z.name} removed`); return;
+  }
   if(n=el('[data-quicksetup-toggle]')){ state.quickSetupOpen=!state.quickSetupOpen; render(); return; }
   if(n=el('[data-qs-apply]')){
     const [i,pid,disc,floor] = n.dataset.qsApply.split('|');
@@ -2430,6 +2470,20 @@ document.addEventListener('click', e=>{
 document.addEventListener('change', e=>{
   const t=e.target, z=curZone();
   if(t.id==='projSel' || t.id==='ganttProjSel'){ state.project=t.value; render(); return; }
+  if(t.dataset.tblEffort!==undefined){
+    const zz=Z.find(x=>x.id===t.dataset.tblEffort); if(!zz) return;
+    zz.effort=Math.max(0.5, Math.round((+t.value||0.5)*2)/2); dbSaveZone(zz); S=build(); render(); return;
+  }
+  if(t.dataset.tblAssign!==undefined){
+    const zz=Z.find(x=>x.id===t.dataset.tblAssign); if(!zz) return;
+    zz.a=t.value||null; if(!zz.a) zz.outsource=null; else if(isFreelance(zz.a) && !zz.outsource) zz.outsource={cost:0};
+    dbSaveZone(zz); S=build(); render(); return;
+  }
+  if(t.dataset.tblStatus!==undefined){
+    const zz=Z.find(x=>x.id===t.dataset.tblStatus); if(!zz) return;
+    zz.status=t.value; if(zz.status==='paused' && !zz.reason) zz.reason=REASONS[0];
+    dbSaveZone(zz); S=build(); render(); return;
+  }
   if(t.id==='projStart'){
     const newDate = t.value; if(!newDate) return;
     const p = proj(state.project);
