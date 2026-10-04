@@ -256,19 +256,31 @@ h1{font-size:34px;font-weight:500;letter-spacing:-.025em;margin:0}
 .effort-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:9px}
 .effort-chips .ec{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2)}
 .tlm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
-.gantt-compact .tl-row{min-height:60px}
-.gantt-compact .tl-lab{padding:9px 12px 9px 0;font-size:14.5px;line-height:1.35}
-.gantt-compact .tl-lab small{font-size:12px;color:var(--muted)}
-.gantt-compact .track{min-height:60px}
-.gantt-compact .bar{height:30px;font-size:12px;padding:0 9px;font-weight:500}
-.bar.two-line{height:38px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;line-height:1.35;gap:1px}
-.bar.two-line .bt{font-size:12px;font-weight:600}
-.bar.two-line .bs{font-size:10.5px;opacity:.85;font-weight:400}
-.gantt-compact .floor-chev{width:22px;height:22px;font-size:13px}
+.gantt-compact .tl-row{min-height:34px}
+.gantt-compact .track{min-height:34px}
+.gantt-compact .tl-row.lvl-section{min-height:36px}
+.gantt-compact .track.lvl-section{min-height:36px}
+.gantt-compact .tl-row.lvl-floor{min-height:34px}
+.gantt-compact .track.lvl-floor{min-height:34px}
+.gantt-compact .floor-chev{width:18px;height:18px;font-size:11px}
 .gantt-row.child{background:var(--card)}
 .gantt-row+.gantt-row{border-top:1px solid var(--line-2)}
 .gantt-compact .tl-row:hover{background:var(--line-2)}
 .gantt-compact .tl-row.child:hover{background:var(--line-2)}
+/* Who works when — тиждень за тижнем, кожна клітинка завжди Project · Scope · Stage · Days */
+.who-head,.who-row{display:grid;grid-template-columns:150px 56px repeat(var(--wcols),minmax(110px,1fr));border-bottom:1px solid var(--line-2)}
+.who-head{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;background:var(--line-2);position:sticky;top:0}
+.who-head>div{padding:8px 8px}
+.who-role{padding:9px 12px 5px;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-2);text-transform:uppercase;background:var(--line-2);border-bottom:1px solid var(--line-2)}
+.who-name{padding:9px 10px;font-size:13px;display:flex;align-items:center;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who-name small{color:var(--muted);font-weight:400}
+.who-cap{padding:9px 6px;font-size:12px;display:flex;align-items:center;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.who-cell{padding:7px 8px;border-left:1px solid var(--line-2);font-size:11px;line-height:1.45;cursor:pointer}
+.who-cell b{display:block;font-size:11.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who-cell small{display:block;color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who-cell.who-free{color:var(--muted);cursor:default}
+.who-cell.who-free small{font-size:10.5px;margin-top:1px}
+.who-grid{overflow-x:auto}
 .gantt-head .tl-weeks span{font-size:10.5px}
 .gl i.wk{background:var(--line-2)}
 .tl-months{display:flex}
@@ -585,7 +597,7 @@ const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const state = {
   tab:'production', project:'tanger1', disc:'viz', offset:0, selZone:null, openFloor:{},
   ganttDisc:'all', ganttOpen:{}, ganttZoom:'week', quickSetupOpen:false, roomsView:'dashboard',
-  calSubview:'fit', teamCalPerson:null, teamCalMonthOffset:0, teamCalSelDay:null, scheduleIssues:[], expandedNotes:{},
+  calSubview:'fit', teamCalPerson:null, teamCalMonthOffset:0, teamCalSelDay:null, scheduleIssues:[], expandedNotes:{}, loadSubview:'overview',
   planView:'gantt', planProject:null, projCalMonthOffset:0, projCalSelDay:null, projCalDisc:'all', planDraw:null, planZoom:false,
   sim:{name:'Tanger 2', team:'viz', ran:false, pick:0, floors:[{name:'Ground', rooms:6, days:2},{name:'First', rooms:8, days:2}]},
   cal:{name:'Vida apartments', effort:15, team:'viz', mode:'split'},
@@ -1067,6 +1079,43 @@ function ganttHead(cols){
   return `<div class="tl-head gantt-head"><div></div><div class="tl-weeks">${cols.map(c=>`<span>${c.label}</span>`).join('')}</div></div>`;
 }
 function barColorFor(team){ return team.length ? person(team[0].id).color : 'var(--ns)'; }
+/* статус групи зон словами з wireframe — DONE / IN WORK / PLANNED / REVISION / PAUSED / UNSCHEDULED, не наш внутрішній label */
+function ganttStatusLabel(zones){
+  if(!zones || !zones.length) return '';
+  if(zones.every(z=>!z.a)) return 'UNSCHEDULED';
+  const statuses = [...new Set(zones.map(z=>z.status))];
+  if(statuses.length>1) return 'MIXED';
+  return ({approved:'DONE', pending:'PLANNED', inprogress:'IN WORK', revision:'REVISION', paused:'PAUSED'})[statuses[0]] || STATUS[statuses[0]].lab.toUpperCase();
+}
+function ganttStatusColor(zones){
+  if(!zones || !zones.length) return 'var(--ns)';
+  if(zones.every(z=>!z.a)) return 'var(--ns)';
+  const statuses = [...new Set(zones.map(z=>z.status))];
+  if(statuses.length>1) return 'var(--ink-2)';
+  return STATUS[statuses[0]].col;
+}
+/* один вирівняний рядок-мітка для всіх рівнів Ганта: Zone | Owner | Effort | Status — завжди ті самі колонки, той самий порядок */
+function ganttRowLabel({label, owner, effort, statusLabel, span, chevronKey, level='room'}){
+  const chev = chevronKey!==undefined
+    ? `<button class="floor-chev ${state.ganttOpen[chevronKey]?'open':''}" data-gantt-toggle="${chevronKey}" aria-label="Expand ${esc(label)}">▸</button>`
+    : `<span style="width:18px;flex:none;display:inline-block"></span>`;
+  const nameStyle = level==='section'
+    ? 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2)'
+    : level==='floor' ? 'font-size:13px;font-weight:600' : 'font-size:12.5px;font-weight:400;color:var(--ink-2)';
+  return `<div class="tl-lab" style="display:grid;grid-template-columns:18px minmax(0,1fr) 32px 42px 78px;gap:7px;align-items:center;padding:0">
+    ${chev}
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameStyle}">${esc(label)}</span>
+    <span style="text-align:center;font-size:11px;font-weight:600;color:var(--ink-2)">${owner?esc(owner):''}</span>
+    <span style="text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--ink-2)">${effort!=null?effort+'d':''}</span>
+    <span style="text-align:right;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em">${statusLabel||''}</span>
+  </div>`;
+}
+/* смужка на Ганті більше не несе тексту — лише коли й який статус кольором; усе інше вже зліва в колонках */
+function ganttBarPlain(span, r, {color='var(--ns)', top=5, height=24}={}){
+  if(!span) return '';
+  const p = ganttPct(iso(span.s), iso(span.e), r); if(!p) return '';
+  return `<div class="bar sm" style="left:${p.left}%;width:calc(${p.width}% - 2px);top:${top}px;height:${height}px;background:${color}"></div>`;
+}
 /* знімок "коли людина закінчує роботу на проєкті" — до і після зміни, щоб ловити побічні затримки */
 function scheduleFinishSnapshot(){
   const map = {};
@@ -1127,16 +1176,19 @@ function projectTeamCard(projectId, discFilter, r, cols, zoom){
   return `<section class="card gantt-compact" style="margin-top:16px">
     <div class="card-h"><h2>Team on ${esc(pr.name)}</h2><span class="hint">only this project's work — not the rest of their calendar</span></div>
     <div class="card-b" style="padding:0">
-      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:160px;min-width:${Math.max(700,cols.length*(zoom==='day'?26:zoom==='week'?56:84))}px">
+      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:220px;min-width:${Math.max(680,220+cols.length*(zoom==='day'?28:zoom==='week'?58:84))}px">
         ${ganttHead(cols)}
         ${people.length? people.map(m=>{
           const segs = projectBlocksOf(m.id, projectId, r);
           const busy = segs.reduce((n,s)=>n+workdays(s.s,s.e),0);
           const pct = Math.round(Math.min(100, busy/inRange*100));
-          return `<div class="tl-row gantt-row"><div class="tl-lab" data-person-load="${m.id}" style="cursor:pointer">
-              <div>${esc(m.name)}<span style="margin-left:6px;color:var(--muted);font-size:10.5px">${pct}%</span></div>
-              <small>${ROLE_LABEL[m.team]||m.team}${m.type==='freelance'?' · freelance':''}</small></div>
-            <div class="track">${ganttGrid(r,cols)}${segs.map(s=>ganttBar(s,r,{bg:m.color,text:workdays(s.s,s.e)+'d'})).join('')}</div></div>`;
+          return `<div class="tl-row gantt-row lvl-floor"><div class="tl-lab" data-person-load="${m.id}" style="cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) 32px 36px 36px;gap:7px;align-items:center">
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500">${esc(m.name)}</span>
+              <span style="text-align:center;font-size:11px;font-weight:600;color:var(--ink-2)">${initials(m)}</span>
+              <span style="text-align:right;font-size:10.5px;color:var(--muted)">${ROLE_LABEL[m.team]==='Designer'?'Des.':ROLE_LABEL[m.team]==='Architect'?'Arch.':ROLE_LABEL[m.team]||m.team}</span>
+              <span style="text-align:right;font-size:12px;font-variant-numeric:tabular-nums">${pct}%</span>
+            </div>
+            <div class="track lvl-floor">${ganttGrid(r,cols)}${segs.map(s=>ganttBarPlain(s,r,{color:m.color, height:18, top:8})).join('')}</div></div>`;
         }).join('') : `<div class="muted" style="padding:16px 18px">No one assigned yet.</div>`}
       </div></div>
     </div>
@@ -1184,29 +1236,22 @@ function ganttSection(projectId, {embedded=false}={}){
       </div>
     </div>
     <div class="card-b" style="padding:0">
-      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:230px;min-width:${Math.max(760,cols.length*(zoom==='day'?30:zoom==='week'?64:92))}px">
+      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:320px;min-width:${Math.max(760,320+cols.length*(zoom==='day'?28:zoom==='week'?58:84))}px">
         ${ganttHead(cols)}
         ${rows.length? rows.map(row=>{
           if(row.kind==='group'){
-            return `<div class="tl-row gantt-row" style="background:var(--line-2);border-bottom:1px solid var(--line)">
-              <div class="tl-lab"><b style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2)">${esc(row.label)}</b>
-                <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:' · not scheduled'}</small></div>
-              <div class="track">${ganttGrid(r,cols)}${ganttBar(row.span,r,{cls:'dim',bg:'var(--ink-2)',text:row.effort+'d',sub:row.span?`${fmt(row.span.s)} – ${fmt(row.span.e)}`:'',top:6})}</div></div>`;
+            return `<div class="tl-row gantt-row lvl-section" style="background:var(--line-2);border-bottom:1px solid var(--line)">
+              ${ganttRowLabel({label:row.label, effort:row.effort, level:'section'})}
+              <div class="track lvl-section">${ganttGrid(r,cols)}${ganttBarPlain(row.span,r,{color:'var(--ink-2)',height:18,top:8})}</div></div>`;
           }
           if(row.kind==='floor'){
-            const open = !!state.ganttOpen[row.fkey];
-            return `<div class="tl-row gantt-row"><div class="tl-lab" style="display:flex;align-items:center;gap:6px">
-                <button class="floor-chev ${open?'open':''}" data-gantt-toggle="${row.fkey}" aria-label="Expand ${esc(row.floor)}">▸</button>
-                <div style="min-width:0;overflow:hidden"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
-                  <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-              </div>
-              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), ip:inProgressTag(row.span), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
-                : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+            return `<div class="tl-row gantt-row lvl-floor">
+              ${ganttRowLabel({label:row.label, owner:row.team[0]?initials(person(row.team[0].id)):'', effort:row.effort, statusLabel:ganttStatusLabel(row.zones), chevronKey:row.fkey, level:'floor'})}
+              <div class="track lvl-floor">${ganttGrid(r,cols)}${ganttBarPlain(row.span,r,{color:ganttStatusColor(row.zones), height:20, top:7})}</div></div>`;
           }
           return `<div class="tl-row gantt-row child" style="cursor:pointer" ${row.single?`data-resched="${row.zoneId}"`:`data-scope-open="${row.fkey}|${esc(row.label)}"`}>
-            <div class="tl-lab" style="padding-left:26px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
-              <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), ip:inProgressTag(row.span), text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+            ${ganttRowLabel({label:row.label, owner:row.team[0]?initials(person(row.team[0].id)):'', effort:row.effort, statusLabel:ganttStatusLabel(row.zones), level:'room'})}
+            <div class="track">${ganttGrid(r,cols)}${ganttBarPlain(row.span,r,{color:ganttStatusColor(row.zones), height:18, top:8})}</div></div>`;
         }).join('') : '<div class="muted" style="padding:20px 18px">No work in this discipline yet.</div>'}
       </div></div>
     </div>
@@ -1263,38 +1308,27 @@ function ganttSectionAll(){
         ${Object.entries(DISC).map(([k,v])=>`<button data-gantt-disc="${k}" aria-pressed="${discFilter===k}">${v.short}</button>`).join('')}</div>
     </div>
     <div class="card-b" style="padding:0">
-      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:230px;min-width:${Math.max(760,cols.length*(zoom==='day'?30:zoom==='week'?64:92))}px">
+      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:320px;min-width:${Math.max(760,320+cols.length*(zoom==='day'?28:zoom==='week'?58:84))}px">
         ${ganttHead(cols)}
         ${rows.length? rows.map(row=>{
           if(row.kind==='project'){
-            const open = !!state.ganttOpen[row.pkey];
-            return `<div class="tl-row gantt-row" style="background:var(--line-2);border-bottom:1px solid var(--line)">
-              <div class="tl-lab" style="display:flex;align-items:center;gap:6px">
-                <button class="floor-chev ${open?'open':''}" data-gantt-toggle="${row.pkey}" aria-label="Expand ${esc(row.label)}">▸</button>
-                <div style="min-width:0"><b style="font-size:12.5px">${esc(row.label)}</b>${avatarStack(row.team,'sm')}
-                  <small style="display:block">${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:' · not scheduled'}</small></div></div>
-              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:'var(--ink-2)',cls:'dim',text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
-                : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+            return `<div class="tl-row gantt-row lvl-section" style="background:var(--line-2);border-bottom:1px solid var(--line)">
+              ${ganttRowLabel({label:row.label, owner:row.team[0]?initials(person(row.team[0].id)):'', effort:row.effort, statusLabel:ganttStatusLabel(row.zones), chevronKey:row.pkey, level:'section'})}
+              <div class="track lvl-section">${ganttGrid(r,cols)}${ganttBarPlain(row.span,r,{color:'var(--ink-2)', height:18, top:8})}</div></div>`;
           }
           if(row.kind==='group'){
-            return `<div class="tl-row gantt-row child" style="background:var(--line-2)">
-              <div class="tl-lab" style="padding-left:20px"><b style="font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-2)">${esc(row.label)}</b>
-                <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-              <div class="track">${ganttGrid(r,cols)}${ganttBar(row.span,r,{cls:'dim',bg:'var(--ink-2)',text:row.effort+'d', sub:row.span?`${fmt(row.span.s)} – ${fmt(row.span.e)}`:'', top:6})}</div></div>`;
+            return `<div class="tl-row gantt-row child lvl-section" style="background:var(--line-2)">
+              ${ganttRowLabel({label:row.label, effort:row.effort, level:'section'})}
+              <div class="track lvl-section">${ganttGrid(r,cols)}${ganttBarPlain(row.span,r,{color:'var(--ink-2)', height:16, top:9})}</div></div>`;
           }
           if(row.kind==='floor'){
-            const open = !!state.ganttOpen[row.fkey];
-            return `<div class="tl-row gantt-row"><div class="tl-lab" style="display:flex;align-items:center;gap:6px;padding-left:20px">
-                <button class="floor-chev ${open?'open':''}" data-gantt-toggle="${row.fkey}" aria-label="Expand ${esc(row.floor)}">▸</button>
-                <div style="min-width:0;overflow:hidden"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
-                  <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div></div>
-              <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), ip:inProgressTag(row.span), text:(row.team[0]?person(row.team[0].id).name+' · ':'')+row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6})
-                : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+            return `<div class="tl-row gantt-row lvl-floor">
+              ${ganttRowLabel({label:row.label, owner:row.team[0]?initials(person(row.team[0].id)):'', effort:row.effort, statusLabel:ganttStatusLabel(row.zones), chevronKey:row.fkey, level:'floor'})}
+              <div class="track lvl-floor">${ganttGrid(r,cols)}${ganttBarPlain(row.span,r,{color:ganttStatusColor(row.zones), height:20, top:7})}</div></div>`;
           }
           return `<div class="tl-row gantt-row child" style="cursor:pointer" ${row.single?`data-resched="${row.zoneId}"`:`data-scope-open="${row.fkey}|${esc(row.label)}"`}>
-            <div class="tl-lab" style="padding-left:40px"><div style="display:flex;align-items:center;gap:6px">${esc(row.label)}${avatarStack(row.team,'sm')}</div>
-              <small>${row.effort}d${row.span?` · ${fmt(row.span.s)}–${fmt(row.span.e)}`:''}</small></div>
-            <div class="track">${ganttGrid(r,cols)}${row.span? ganttBar(row.span,r,{bg:barColorFor(row.team), ip:inProgressTag(row.span), text:row.effort+'d', sub:`${fmt(row.span.s)} – ${fmt(row.span.e)}`, top:6}) : `<div class="muted" style="font-size:10.5px;padding:7px 0">${esc(groupStatusNote(row.zones))}</div>`}</div></div>`;
+            ${ganttRowLabel({label:row.label, owner:row.team[0]?initials(person(row.team[0].id)):'', effort:row.effort, statusLabel:ganttStatusLabel(row.zones), level:'room'})}
+            <div class="track">${ganttGrid(r,cols)}${ganttBarPlain(row.span,r,{color:ganttStatusColor(row.zones), height:18, top:8})}</div></div>`;
         }).join('') : '<div class="muted" style="padding:20px 18px">No confirmed work yet.</div>'}
       </div></div>
     </div>
@@ -1946,7 +1980,70 @@ function teamLoadPanel(per){
   </section>`;
 }
 
+/* === Who works when: окреме питання від Studio load — "хто ЩО КОНКРЕТНО робить" === */
+function whoWeeks(r, n){ const w=[]; let d=r.start; for(let i=0;i<n;i++){ w.push({s:d,e:addDays(d,6)}); d=addDays(d,7); } return w; }
+function personWeekSummary(personId, week){
+  const tally = new Map(); let busy=0;
+  for(let d=new Date(week.s); d<=week.e; d=addDays(d,1)){
+    if(d.getDay()===0||d.getDay()===6) continue;
+    const ids = S.occ[personId] && S.occ[personId].get(iso(d));
+    if(ids && ids.length) ids.forEach(zid=>{ tally.set(zid,(tally.get(zid)||0)+1/ids.length); busy+=1/ids.length; });
+  }
+  const avail = workdays(week.s, week.e);
+  const items = [...tally.entries()].map(([zid,d])=>({z:Z.find(x=>x.id===zid), d:Math.round(d*4)/4})).filter(x=>x.z).sort((a,b)=>b.d-a.d);
+  return {free:Math.max(0,Math.round((avail-busy)*4)/4), items};
+}
+function whoCell(personId, week){
+  const sm = personWeekSummary(personId, week);
+  if(!sm.items.length) return `<div class="who-cell who-free">AVAILABLE<small>${sm.free}d free</small></div>`;
+  const top = sm.items[0];
+  const stage = top.z.status==='revision' ? 'Rev' : (top.z.d==='viz'?'3D':'WD');
+  const extra = sm.items.length>1 ? ` +${sm.items.length-1}` : '';
+  return `<div class="who-cell" data-open-zone="${top.z.id}">
+    <b>${esc(proj(top.z.p).name)}</b><small>${esc(top.z.floor)} · ${stage} · ${top.d}d${extra}</small>
+  </div>`;
+}
+function viewWhoWorksWhen(){
+  const r = range();
+  const weeks = whoWeeks(r, 6);
+  const groups = [['viz','Designers'],['wd','Architects'],['pm','Procurement']];
+  return `<div class="card-b" style="padding:0">
+    <div class="who-grid" style="--wcols:${weeks.length}">
+      <div class="who-head">
+        <div class="who-name">Team member</div><div class="who-cap">Capacity</div>
+        ${weeks.map(w=>`<div class="who-wk">${fmt(w.s)} – ${fmt(w.e)}</div>`).join('')}
+      </div>
+      ${groups.map(([role,label])=>{
+        const members = TEAM.filter(m=>m.team===role); if(!members.length) return '';
+        const inRange = workdays(new Date(Math.max(TODAY,r.start)), r.end)||1;
+        return `<div class="who-role">${label.toUpperCase()}</div>
+          ${members.map(m=>{
+            const busy = whoWeeks(r,10).reduce((n,w)=>n+(workdays(w.s,w.e)-personWeekSummary(m.id,w).free),0);
+            const pct = Math.round(Math.min(100,busy/inRange*100));
+            return `<div class="who-row">
+              <div class="who-name" data-person-load="${m.id}" style="cursor:pointer">${esc(m.name)}${m.type==='freelance'?' <small>· freelance</small>':''}</div>
+              <div class="who-cap">${pct}%</div>
+              ${weeks.map(w=>whoCell(m.id,w)).join('')}
+            </div>`;
+          }).join('')}`;
+      }).join('')}
+    </div>
+  </div>`;
+}
 function viewLoad(){
+  if((state.loadSubview||'overview')==='who'){
+    return `<div class="head"><h1>Who works when</h1><span class="hint" style="font-size:13px;color:var(--muted)">what each person is doing, project and all — not just a day count</span></div>
+      ${issuesBanner()}
+      <section class="card">
+        <div class="card-h"><h2>Who works when</h2>
+          <div class="seg"><button data-load-subview="overview" aria-pressed="false">Load overview</button><button data-load-subview="who" aria-pressed="true">Who works when</button></div>
+        </div>
+        ${viewWhoWorksWhen()}
+      </section>`;
+  }
+  return viewLoadOverview();
+}
+function viewLoadOverview(){
   const r = range();
   const live = Z.filter(z=>proj(z.p).status==='confirmed');
   const confirmed = live.reduce((n,z)=>n+active(z),0);
@@ -1966,7 +2063,10 @@ function viewLoad(){
   stages.sort((a,b)=>a.p.prio-b.p.prio || (a.d==='viz'?-1:1));
 
   return `
-  <div class="head"><h1>Studio load · all projects</h1></div>
+  <div class="head" style="display:flex;align-items:center;flex-wrap:wrap;gap:10px"><h1 style="margin:0">Studio load · all projects</h1>
+    <div class="spacer"></div>
+    <div class="seg"><button data-load-subview="overview" aria-pressed="true">Load overview</button><button data-load-subview="who" aria-pressed="false">Who works when</button></div>
+  </div>
   ${issuesBanner()}
   <div class="kpis">
     <div class="kpi"><div class="l">Confirmed effort</div><div class="v">${confirmed} days</div><div class="f">left in confirmed projects</div></div>
@@ -3004,6 +3104,7 @@ document.addEventListener('click', e=>{
   if(n=el('[data-resched]')){ openRescheduleDrawer(n.dataset.resched); return; }
   if(n=el('[data-issue-resolve]')){ state.scheduleIssues=state.scheduleIssues.filter(i=>i.id!==n.dataset.issueResolve); render(); toast('Marked resolved'); return; }
   if(n=el('[data-cal-subview]')){ state.calSubview=n.dataset.calSubview; render(); return; }
+  if(n=el('[data-load-subview]')){ state.loadSubview=n.dataset.loadSubview; render(); return; }
   if(n=el('[data-teamcal-shift]')){
     const v=n.dataset.teamcalShift;
     state.teamCalMonthOffset = v==='0' ? 0 : (state.teamCalMonthOffset||0)+(+v);
