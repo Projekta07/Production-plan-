@@ -2689,7 +2689,7 @@ function openFloorPlanViewer(fpId){
     ${drawing? `<div style="background:var(--warn-t);color:#fff;border-radius:10px;padding:10px 14px;margin-bottom:8px;font-size:13px;font-weight:500">✏️ Drawing mode — tap anywhere on the plan below to place a point (${drawing.points.length} so far)</div>`:''}
     <div style="border:${drawing?'2px solid var(--warn-t)':'1px solid var(--line)'};border-radius:10px;overflow:${zoomed?'auto':'hidden'};max-height:${zoomed?'62vh':'none'}">
       <div data-plan-wrap="${fpId}" style="position:relative;width:${zoomed?'230%':'100%'};${drawing?'cursor:pointer;touch-action:manipulation':''}">
-        ${fp.imageUrl? `<img src="${esc(fp.imageUrl)}" draggable="false" style="width:100%;display:block;-webkit-user-select:none;user-select:none;pointer-events:none">` : `<div class="muted" style="padding:40px;text-align:center">No image uploaded yet</div>`}
+        ${fp.imageUrl? `<img src="${esc(fp.imageUrl)}" draggable="false" style="width:100%;display:block;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;pointer-events:none">` : `<div class="muted" style="padding:40px;text-align:center">No image uploaded yet</div>`}
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
           ${Object.entries(polys).map(([zid,pts])=>{
             const z = Z.find(x=>x.id===zid); if(!z || !pts.length) return '';
@@ -2883,6 +2883,25 @@ function render(){
 function curZone(){ return Z.find(x=>x.id===state.selZone) }
 function changed(msg){ dbSaveZone(curZone()); S=build(); render(); if(state.selZone) openZone(state.selZone); if(msg) toast(msg); }
 
+/* додає точку контуру з реальних екранних координат — викликається і з click (десктоп/миша), і з touchend (iPad/телефон) напряму */
+function addPlanPoint(wrapEl, clientX, clientY){
+  const rect = wrapEl.getBoundingClientRect();
+  if(rect.width<=0 || rect.height<=0) return;
+  const x = Math.max(0,Math.min(100, (clientX-rect.left)/rect.width*100));
+  const y = Math.max(0,Math.min(100, (clientY-rect.top)/rect.height*100));
+  state.planDraw.points.push([Math.round(x*10)/10, Math.round(y*10)/10]);
+  openFloorPlanViewer(wrapEl.dataset.planWrap);
+}
+/* окремий, незалежний від звичайного click слухач дотиків — на iPad синтетичний click іноді не долітає через
+   нативні жести Safari над зображенням; тут координати читаються напряму з самої touch-події */
+document.addEventListener('touchend', e=>{
+  const wrap = e.target.closest('[data-plan-wrap]');
+  if(!wrap || !state.planDraw || state.planDraw.planId!==wrap.dataset.planWrap) return;
+  const touch = e.changedTouches && e.changedTouches[0]; if(!touch) return;
+  e.preventDefault(); // не даємо синтетичному click спрацювати слідом і додати ту саму точку вдруге
+  addPlanPoint(wrap, touch.clientX, touch.clientY);
+}, {passive:false});
+
 document.addEventListener('click', e=>{
   const el=s=>e.target.closest(s); let n;
   if(el('[data-close]') || e.target.id==='scrim'){ closeDrawer(); return; }
@@ -2949,15 +2968,7 @@ document.addEventListener('click', e=>{
   }
   if(n=el('[data-plan-zoom-toggle]')){ state.planZoom=!state.planZoom; openFloorPlanViewer(n.dataset.planZoomToggle); return; }
   if(n=el('[data-plan-wrap]') && state.planDraw && state.planDraw.planId===n.dataset.planWrap){
-    // клік по самому контейнеру плану (не по кнопці) в режимі малювання завжди додає точку,
-    // незалежно від того, чи влучили по зображенню, порожньому фону, чи поверх уже готового контуру
-    const rect = n.getBoundingClientRect();
-    if(rect.width>0 && rect.height>0){
-      const x = Math.max(0,Math.min(100, (e.clientX-rect.left)/rect.width*100));
-      const y = Math.max(0,Math.min(100, (e.clientY-rect.top)/rect.height*100));
-      state.planDraw.points.push([Math.round(x*10)/10, Math.round(y*10)/10]);
-      openFloorPlanViewer(n.dataset.planWrap);
-    }
+    addPlanPoint(n, e.clientX, e.clientY);
     return;
   }
   if(n=el('[data-plan-zone]')){ openZone(n.dataset.planZone); return; }
