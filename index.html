@@ -993,6 +993,47 @@ function ganttHead(cols){
 }
 function barColorFor(team){ return team.length ? person(team[0].id).color : 'var(--ns)'; }
 
+/* сегменти календаря людини, що належать САМЕ цьому проєкту — не весь її графік, лише ця робота */
+function projectBlocksOf(personId, projectId, r){
+  const out=[]; let cur=null, d=new Date(r.start);
+  while(d<=r.end){
+    if(isWork(d)){
+      const key=iso(d);
+      const zid = S.occ[personId].get(key);
+      const z = zid ? S.byId.get(zid) : null;
+      if(z && z.p===projectId){ if(cur) cur.e=key; else { cur={s:key,e:key}; out.push(cur); } }
+      else cur=null;
+    }
+    d=addDays(d,1);
+  }
+  return out.map(seg=>({s:D(seg.s), e:D(seg.e)}));
+}
+/* картка «Team on <project>» — та сама шкала/дисципліна, що й Гант вище, але загрузка лише по цьому проєкту */
+function projectTeamCard(projectId, discFilter, r, cols, zoom){
+  const pr = proj(projectId);
+  const zones = Z.filter(z=>z.p===projectId && (discFilter==='all'||z.d===discFilter));
+  const inRange = workdays(new Date(Math.max(TODAY,r.start)), r.end) || 1;
+  const people = [...new Set(zones.map(z=>z.a).filter(Boolean))].map(id=>person(id))
+    .sort((a,b)=> (b.team===a.team? 0 : a.team==='viz'?-1:1) || a.name.localeCompare(b.name));
+  return `<section class="card gantt-compact" style="margin-top:16px">
+    <div class="card-h"><h2>Team on ${esc(pr.name)}</h2><span class="hint">only this project's work — not the rest of their calendar</span></div>
+    <div class="card-b" style="padding:0">
+      <div class="tlm-wrap" style="border:0;border-radius:0"><div class="tl" style="--lab:160px;min-width:${Math.max(700,cols.length*(zoom==='day'?26:zoom==='week'?56:84))}px">
+        ${ganttHead(cols)}
+        ${people.length? people.map(m=>{
+          const segs = projectBlocksOf(m.id, projectId, r);
+          const busy = segs.reduce((n,s)=>n+workdays(s.s,s.e),0);
+          const pct = Math.round(Math.min(100, busy/inRange*100));
+          return `<div class="tl-row gantt-row"><div class="tl-lab" data-person-load="${m.id}" style="cursor:pointer">
+              <div>${esc(m.name)}<span style="margin-left:6px;color:var(--muted);font-size:10.5px">${pct}%</span></div>
+              <small>${ROLE_LABEL[m.team]||m.team}${m.type==='freelance'?' · freelance':''}</small></div>
+            <div class="track">${ganttGrid(r,cols)}${segs.map(s=>ganttBar(s,r,{bg:m.color,text:workdays(s.s,s.e)+'d'})).join('')}</div></div>`;
+        }).join('') : `<div class="muted" style="padding:16px 18px">No one assigned yet.</div>`}
+      </div></div>
+    </div>
+  </section>`;
+}
+
 /* реюзабельна картка Ганта — викликається і зі своєї вкладки, і вбудовано знизу Project calculator */
 function ganttSection(projectId, {embedded=false}={}){
   const pr = proj(projectId);
@@ -1058,7 +1099,8 @@ function ganttSection(projectId, {embedded=false}={}){
         }).join('') : '<div class="muted" style="padding:20px 18px">No work in this discipline yet.</div>'}
       </div></div>
     </div>
-  </section>`;
+  </section>
+  ${projectTeamCard(pr.id, discFilter, r, cols, zoom)}`;
 }
 
 function viewGanttPlan(){
