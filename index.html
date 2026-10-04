@@ -340,7 +340,7 @@ function toDbZone(z){
     id:z.id, project_id:z.p, discipline:z.d, floor:z.floor??null, n:z.n, name:z.name,
     effort:z.effort, rev_effort:z.revEffort??1, status:z.status, assignee_id:z.a??null,
     earliest:z.earliest, reason:z.reason??null, scope:z.scope??null,
-    v1_delivered: z.v1Delivered??null, revision_note: z.revisionNote??null,
+    v1_delivered: z.v1Delivered??null, v1_start: z.v1Start??null, revision_note: z.revisionNote??null,
     outsource_cost: z.outsource? z.outsource.cost : null,
     after_project_id: z.after? z.after.p : null,
     after_floor: z.after? z.after.floor : null,
@@ -353,7 +353,7 @@ function fromDbZone(r){
     id:r.id, p:r.project_id, d:r.discipline, floor:r.floor, n:r.n, name:r.name,
     effort:Number(r.effort), revEffort:Number(r.rev_effort), status:r.status, a:r.assignee_id,
     earliest:r.earliest, reason:r.reason, scope:r.scope??undefined,
-    v1Delivered:r.v1_delivered??undefined, revisionNote:r.revision_note??undefined,
+    v1Delivered:r.v1_delivered??undefined, v1Start:r.v1_start??undefined, revisionNote:r.revision_note??undefined,
     outsource: r.outsource_cost!=null? {cost:Number(r.outsource_cost)} : undefined,
     after: r.after_project_id? {p:r.after_project_id, floor:r.after_floor, lag:r.after_lag} : undefined,
   };
@@ -608,6 +608,13 @@ function active(z){
   return z.effort;
 }
 function floorOrder(f){ return ({'Ground':1,'1 floor':1,'First':2,'2 floor':2,'Second':3,'Exterior':4,'Hall':1,'AD':5,'LS':6})[f]||9 }
+/* прикинутий кінець фази, коли її ще не поставлено в реальний розклад — суцільні робочі дні від старту */
+function projectedEnd(start, duration){
+  const total = Math.max(1, Math.ceil(duration));
+  let d = new Date(start); while(!isWork(d)) d = addDays(d,1);
+  let count = 1; while(count < total){ d = addDays(d,1); if(isWork(d)) count++; }
+  return d;
+}
 /* 0.125d = 1 год (8-годинний день) — лише для показу; розклад усе одно бронює людині цілий календарний день */
 function fmtEffortHM(d){
   if(d < 1){ const h=Math.round(d*8*4)/4; return (h%1===0?h:h.toFixed(2).replace(/0+$/,'').replace(/\.$/,''))+'h'; }
@@ -2617,25 +2624,63 @@ function openZone(id){
       <select data-reason>${REASONS.map(r=>`<option ${z.reason===r?'selected':''}>${r}</option>`).join('')}</select>
       <div class="muted" style="font-size:12.5px;margin-top:7px">Paused ${dc.unit1} releases the ${dc.role.toLowerCase()} — the calendar gives those days to other work.</div></div>`:''}
 
-    <div class="field"><div class="fl">First version effort</div>
-      <div class="stepper"><button data-eff="-0.5">−</button><span>${z.effort} d</span><button data-eff="0.5">+</button></div></div>
+    <div class="field"><div class="fl" style="font-size:13.5px;font-weight:500;color:var(--ink);margin-bottom:12px">Schedule</div>
 
-    <div class="field"><div class="fl">First version delivered</div>
-      <input type="date" data-v1delivered value="${z.v1Delivered||''}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
-      <div class="muted" style="font-size:12px;margin-top:7px">Set once you actually hand this version to the client — not tracked automatically, leave empty until then.</div></div>
+      ${(()=>{
+        const v1Live = z.status==='pending' || z.status==='inprogress'; // перша версія — це й є поточна активна робота
+        const v1Badge = z.status==='approved'||z.status==='revision' ? {lab:'Completed',col:'var(--appr)',ink:'var(--appr-t)'}
+          : z.status==='inprogress' ? {lab:'In progress',col:'var(--inprog)',ink:'var(--inprog-t)'}
+          : z.status==='paused' ? {lab:'Paused',col:'var(--pause)',ink:'var(--pause-t)'}
+          : {lab:'Not started',col:'var(--ns)',ink:'var(--ink-2)'};
+        const v1Start = v1Live ? (s&&s.s?D(s.s):D(z.earliest)) : (z.v1Start? D(z.v1Start) : null);
+        const v1End = v1Live ? (s&&s.e? D(s.e) : projectedEnd(v1Start, z.effort)) : (z.v1Delivered? D(z.v1Delivered) : null);
+        const v1Projected = v1Live && !(s&&s.s);
+        return `<div style="background:var(--line-2);border-radius:13px;padding:14px;margin-bottom:${z.status==='revision'?'12px':'4px'}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
+            <b style="font-size:13.5px">First version (${dc.short})</b>
+            <span class="status-chip" style="background:${v1Badge.col};color:${v1Badge.ink};font-size:10.5px">${v1Badge.lab}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1.3fr 1.3fr;gap:8px">
+            <div><div class="muted" style="font-size:10.5px;margin-bottom:4px">Duration</div>
+              <div class="stepper" style="width:100%"><button data-eff="-0.5">−</button><span style="flex:1;text-align:center">${z.effort}d</span><button data-eff="0.5">+</button></div></div>
+            <div><div class="muted" style="font-size:10.5px;margin-bottom:4px">Start date${v1Live?' (not before)':''}</div>
+              ${v1Live
+                ? `<input type="date" data-earliest value="${z.earliest}" style="width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 9px;font-size:12.5px">`
+                : `<input type="date" data-v1start value="${z.v1Start||''}" style="width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 9px;font-size:12.5px">`}</div>
+            <div><div class="muted" style="font-size:10.5px;margin-bottom:4px">End date${v1Live?' (projected)':''}</div>
+              ${v1Live
+                ? `<div style="border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 9px;font-size:12.5px;color:var(--ink-2)">${v1End?fmt(v1End):'—'}${v1Projected?' *':''}</div>`
+                : `<input type="date" data-v1delivered value="${z.v1Delivered||''}" style="width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 9px;font-size:12.5px">`}</div>
+          </div>
+          ${v1Projected? `<div class="muted" style="font-size:10.5px;margin-top:8px">* projected — not yet actually scheduled, this assumes no gaps</div>`:''}
+          ${!v1Live? `<div class="muted" style="font-size:10.5px;margin-top:8px">Historical — set once you know it, not tracked live since this phase is already behind you.</div>`:''}
+        </div>`;
+      })()}
 
-    ${z.status==='revision'?`<div class="field"><div class="fl">Revision effort</div>
-      <div class="stepper"><button data-rev="-0.0625" title="−30 min">−30m</button><button data-rev="-0.125" title="−1 hour">−1h</button>
-        <span style="padding:0 10px">${fmtEffortHM(z.revEffort)}</span>
-        <button data-rev="0.125" title="+1 hour">+1h</button><button data-rev="0.0625" title="+30 min">+30m</button></div>
-      <div class="muted" style="font-size:11.5px;margin-top:7px">Tracks the real time a fix takes — the schedule still books that person a full calendar day for it, same as any other task.</div></div>
-
-    <div class="field"><div class="fl">What needs fixing</div>
-      <textarea data-revnote rows="3" placeholder="e.g. lighter wood tone, move the pendant light left" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px;font:inherit;font-size:13.5px;resize:vertical">${esc(z.revisionNote||'')}</textarea></div>`:''}
-
-    <div class="field"><div class="fl">${z.status==='revision'?'Revision':'First version'} — not before</div>
-      <input type="date" data-earliest value="${z.earliest}" style="width:100%;border:1px solid var(--line);background:var(--line-2);border-radius:11px;padding:10px 12px">
-      <div class="muted" style="font-size:12px;margin-top:7px">${s&&s.s? `${z.status==='revision'?'Revision':'First version'} currently scheduled ${fmt(D(s.s))} – ${fmt(D(s.e))}. Moving this later pushes anything waiting on it too.` : 'Moves when the team actually gets to it — everything downstream follows automatically.'}</div></div>
+      ${z.status==='revision'?(()=>{
+        const revStart = s&&s.s ? D(s.s) : D(z.earliest);
+        const revEnd = s&&s.e ? D(s.e) : projectedEnd(revStart, z.revEffort);
+        const revProjected = !(s&&s.s);
+        const revBadge = (s&&s.s && inProgressTag({s:revStart,e:revEnd})) ? {lab:'In progress',col:'var(--inprog)',ink:'var(--inprog-t)'} : {lab:'Planned',col:'var(--rev)',ink:'var(--rev-t)'};
+        return `<div style="background:var(--line-2);border-radius:13px;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">
+            <b style="font-size:13.5px">Revision</b>
+            <span class="status-chip" style="background:${revBadge.col};color:${revBadge.ink};font-size:10.5px">${revBadge.lab}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1.3fr 1.3fr;gap:8px">
+            <div><div class="muted" style="font-size:10.5px;margin-bottom:4px">Duration</div>
+              <div class="stepper" style="width:100%;font-size:11px"><button data-rev="-0.125" title="−1h">−1h</button><span style="flex:1;text-align:center;font-size:12px">${fmtEffortHM(z.revEffort)}</span><button data-rev="0.125" title="+1h">+1h</button></div></div>
+            <div><div class="muted" style="font-size:10.5px;margin-bottom:4px">Start date (not before)</div>
+              <input type="date" data-earliest value="${z.earliest}" style="width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 9px;font-size:12.5px"></div>
+            <div><div class="muted" style="font-size:10.5px;margin-bottom:4px">End date${revProjected?' (projected)':''}</div>
+              <div style="border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 9px;font-size:12.5px;color:var(--ink-2)">${fmt(revEnd)}${revProjected?' *':''}</div></div>
+          </div>
+          ${revProjected?`<div class="muted" style="font-size:10.5px;margin-top:8px">* projected from the start date — moving it later pushes anything waiting on this room too</div>`:`<div class="muted" style="font-size:10.5px;margin-top:8px">Currently scheduled ${fmt(revStart)} – ${fmt(revEnd)}</div>`}
+          <div style="margin-top:12px"><div class="muted" style="font-size:10.5px;margin-bottom:4px">What needs fixing</div>
+            <textarea data-revnote rows="2" placeholder="e.g. lighter wood tone, move the pendant light left" style="width:100%;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 9px;font:inherit;font-size:12.5px;resize:vertical">${esc(z.revisionNote||'')}</textarea></div>
+        </div>`;
+      })():''}
+    </div>
 
     <div class="field"><div class="fl">${dc.role}</div>
       <select data-assign><option value="">Not assigned</option>
@@ -3071,6 +3116,7 @@ document.addEventListener('change', e=>{
   if(z && t.dataset.reason!==undefined){ z.reason=t.value; changed(`${z.name}: ${z.reason}`); return; }
   if(z && t.dataset.earliest!==undefined){ if(!t.value) return; z.earliest=t.value; changed(`${z.name}: nothing before ${fmt(D(z.earliest))}`); return; }
   if(z && t.dataset.v1delivered!==undefined){ z.v1Delivered=t.value||null; changed(z.v1Delivered?`First version marked delivered ${fmt(D(z.v1Delivered))}`:'First-version delivery date cleared'); return; }
+  if(z && t.dataset.v1start!==undefined){ z.v1Start=t.value||null; changed(z.v1Start?`First version start set to ${fmt(D(z.v1Start))}`:'First-version start date cleared'); return; }
   if(z && t.dataset.revnote!==undefined){ z.revisionNote=t.value; dbSaveZone(z); render(); return; }
   if(z && t.dataset.outfee!==undefined){ if(!z.outsource) z.outsource={cost:0}; z.outsource.cost=Math.max(0,+t.value||0); changed(`${z.name}: outsourced · ${money(z.outsource.cost)}`); return; }
   if(t.dataset.teamName!==undefined){ const m=person(t.dataset.teamName); m.name=t.value.trim()||m.name; dbSaveTeam(m); render(); return; }
